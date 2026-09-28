@@ -13,7 +13,7 @@ import { Offer, PaymentRequestResponse } from "@/lib/types";
 import { LICENSE_TYPE_LABELS } from "@/lib/licenseTypes";
 
 const POLL_INTERVAL_MS = Number(
-  process.env.NEXT_PUBLIC_STATUS_POLL_INTERVAL_MS ?? 3000
+  process.env.NEXT_PUBLIC_STATUS_POLL_INTERVAL_MS ?? 3000,
 );
 
 /**
@@ -31,7 +31,11 @@ const POLL_INTERVAL_MS = Number(
  * replace the `setInterval` block below with a subscription; everything
  * else on this page stays the same.
  */
-export default function PaymentPage({ params }: { params: { offerId: string } }) {
+export default function PaymentPage({
+  params,
+}: {
+  params: { offerId: string };
+}) {
   const [offer, setOffer] = useState<Offer | null>(null);
   const [payment, setPayment] = useState<PaymentRequestResponse | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -113,45 +117,77 @@ export default function PaymentPage({ params }: { params: { offerId: string } })
           {/* LEFT: license summary */}
           <div>
             <div className="flex items-center gap-4">
-              <ContentPreview url={offer.contentUrl} title={offer.title} size="small" />
+              <ContentPreview
+                url={offer.contentUrl}
+                title={offer.title}
+                size="small"
+              />
               <div>
                 <p className="font-semibold text-text-primary">{offer.title}</p>
-                <p className="text-sm text-text-secondary mt-1">{LICENSE_TYPE_LABELS[offer.licenseType]} License</p>
+                <p className="text-sm text-text-secondary mt-1">
+                  {LICENSE_TYPE_LABELS[offer.licenseType]} License
+                </p>
               </div>
             </div>
 
             <div className="mt-6 rounded-lg bg-white border border-border p-6">
-              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Amount</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                Amount
+              </p>
               <div className="mt-2 flex items-center gap-3">
                 <span className="text-2xl text-yellow-500">₿</span>
-                <p className="text-3xl font-bold text-text-primary">{payment.amountSats.toLocaleString()} sats</p>
+                <p className="text-3xl font-bold text-text-primary">
+                  {payment.amountSats.toLocaleString()} sats
+                </p>
               </div>
             </div>
 
             <Card className="mt-6">
-              <h3 className="mb-2 text-sm font-semibold text-text-primary">Secure & Fast</h3>
-              <p className="mb-4 text-sm text-text-secondary">Powered by Bitcoin Lightning for instant, low-cost payments.</p>
+              <h3 className="mb-2 text-sm font-semibold text-text-primary">
+                Secure & Fast
+              </h3>
+              <p className="mb-4 text-sm text-text-secondary">
+                Powered by Bitcoin Lightning for instant, low-cost payments.
+              </p>
 
               <ol className="space-y-4">
                 <li className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-sm font-semibold">1</div>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-sm font-semibold">
+                    1
+                  </div>
                   <div>
-                    <p className="font-semibold text-sm text-text-primary">You pay</p>
-                    <p className="text-sm text-text-secondary">Scan the QR code or copy the invoice.</p>
+                    <p className="font-semibold text-sm text-text-primary">
+                      You pay
+                    </p>
+                    <p className="text-sm text-text-secondary">
+                      Scan the QR code or copy the invoice.
+                    </p>
                   </div>
                 </li>
                 <li className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-sm font-semibold">2</div>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-sm font-semibold">
+                    2
+                  </div>
                   <div>
-                    <p className="font-semibold text-sm text-text-primary">We verify</p>
-                    <p className="text-sm text-text-secondary">Payment is confirmed on the Lightning network.</p>
+                    <p className="font-semibold text-sm text-text-primary">
+                      We verify
+                    </p>
+                    <p className="text-sm text-text-secondary">
+                      Payment is confirmed on the Lightning network.
+                    </p>
                   </div>
                 </li>
                 <li className="flex items-start gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-sm font-semibold">3</div>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-sm font-semibold">
+                    3
+                  </div>
                   <div>
-                    <p className="font-semibold text-sm text-text-primary">License is recorded</p>
-                    <p className="text-sm text-text-secondary">A Nostr event is created and published.</p>
+                    <p className="font-semibold text-sm text-text-primary">
+                      License is recorded
+                    </p>
+                    <p className="text-sm text-text-secondary">
+                      A Nostr event is created and published.
+                    </p>
                   </div>
                 </li>
               </ol>
@@ -161,8 +197,12 @@ export default function PaymentPage({ params }: { params: { offerId: string } })
           {/* RIGHT: payment instructions */}
           <Card>
             <div>
-              <h2 className="mb-1 text-lg font-semibold text-text-primary">Pay with Bitcoin Lightning</h2>
-              <p className="mb-6 text-sm text-text-secondary">Fast, low-cost payment using the Lightning Network.</p>
+              <h2 className="mb-1 text-lg font-semibold text-text-primary">
+                Pay with Bitcoin Lightning
+              </h2>
+              <p className="mb-6 text-sm text-text-secondary">
+                Fast, low-cost payment using the Lightning Network.
+              </p>
             </div>
 
             <div className="rounded-lg border border-border bg-surface p-4">
@@ -178,8 +218,6 @@ export default function PaymentPage({ params }: { params: { offerId: string } })
             <div className="mt-6">
               <PaymentStatus confirmed={confirmed} offerId={offer.offerId} />
             </div>
-
-            
           </Card>
         </div>
       </div>
