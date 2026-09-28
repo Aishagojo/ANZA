@@ -28,14 +28,17 @@ export function ContentPreviewDemo({
   }, [url]);
 
   const isVideoFile = /\.(mp4|webm|mov)$/i.test(url);
-  const dimensions = size === "large" ? "aspect-video" : "aspect-square h-16 w-16 shrink-0";
+  const dimensions =
+    size === "large" ? "aspect-video" : "aspect-square h-16 w-16 shrink-0";
 
   const embedSrc = youtubeId
     ? `https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=${muted ? 1 : 0}&playsinline=1&rel=0&modestbranding=1`
     : null;
 
   return (
-    <div className={`relative overflow-hidden rounded-lg bg-surface ${dimensions}`}>
+    <div
+      className={`relative overflow-hidden rounded-lg bg-surface ${dimensions}`}
+    >
       {youtubeId ? (
         <iframe
           src={embedSrc ?? undefined}
@@ -45,7 +48,13 @@ export function ContentPreviewDemo({
           allowFullScreen
         />
       ) : isVideoFile ? (
-        <video src={url} className="h-full w-full object-cover" controls={size === "large"} autoPlay={size === "large"} muted={size === "large"} />
+        <video
+          src={url}
+          className="h-full w-full object-cover"
+          controls={size === "large"}
+          autoPlay={size === "large"}
+          muted={size === "large"}
+        />
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt={title} className="h-full w-full object-cover" />
