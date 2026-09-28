@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:3000/api/v1"
+      "url": "http://localhost:3000/api"
     }
   ],
   "components": {
@@ -15,6 +15,18 @@
       "Terms": {
         "type": "object",
         "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "\\S"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "pattern": "\\S"
+          },
           "brand": {
             "type": "string",
             "minLength": 1,
@@ -129,6 +141,18 @@
           "terms": {
             "type": "object",
             "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "pattern": "\\S"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000,
+                "pattern": "\\S"
+              },
               "brand": {
                 "type": "string",
                 "minLength": 1,
@@ -674,6 +698,18 @@
           "terms": {
             "type": "object",
             "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "pattern": "\\S"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000,
+                "pattern": "\\S"
+              },
               "brand": {
                 "type": "string",
                 "minLength": 1,

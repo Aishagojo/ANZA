@@ -14,7 +14,7 @@ const key = { name: 'Idempotency-Key', in: 'header', required: true, schema: { t
 export const contract = {
   openapi: '3.1.0',
   info: { title: 'ContentPort API', version: '0.2.0', description: 'Day 2 offer routes implemented. Payment routes remain planned.' },
-  servers: [{ url: 'http://localhost:3000/api/v1' }],
+  servers: [{ url: 'http://localhost:3000/api' }],
   components: { schemas, securitySchemes: {
     nostrAuth: { type: 'apiKey', in: 'header', name: 'Authorization', description: 'Nostr <base64 signed NIP-98 event>. POST events must bind the raw body hash and contentport-idempotency-key tag. See docs/day-2.md.' }
   } },

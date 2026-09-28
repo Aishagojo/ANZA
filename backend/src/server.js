@@ -12,7 +12,7 @@ const store = new PostgresOfferStore(pool);
 await pool.query('SELECT 1 FROM nostr_outbox LIMIT 1');
 const service = createOfferService({ store, verifyEvent, ...config });
 const publish = createRelayPublisher({ relays: config.relays });
-const server = createApp({ service, verifyEvent, origin: config.origin });
+const server = createApp({ service, verifyEvent, origin: config.origin, corsOrigin: config.corsOrigin });
 let stopping = false;
 let active;
 const tick = () => {

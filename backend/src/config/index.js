@@ -20,6 +20,7 @@ export function readConfig(env = process.env) {
       throw new Error('Relays must use wss://, or ws:// on localhost');
     }
   }
-  return { host: env.HOST || '127.0.0.1', port, origin: origin.origin,
-    databaseUrl: env.DATABASE_URL, kind, attestorPubkey: env.NOSTR_ATTESTOR_PUBKEY, relays };
+  const corsOrigin = env.CORS_ORIGIN ? new URL(env.CORS_ORIGIN).origin : null;
+  return { host: env.HOST || '127.0.0.1', port, origin: origin.origin, corsOrigin,
+    databaseUrl: env.DATABASE_URL, kind, attestorPubkey: env.NOSTR_ATTESTOR_PUBKEY || null, relays };
 }

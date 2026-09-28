@@ -5,6 +5,23 @@ export class PostgresOfferStore {
   async getOffer(id) {
     return (await this.pool.query('SELECT document FROM offers WHERE id = $1', [id])).rows[0]?.document;
   }
+  async saveOfferDocument(document) {
+    const id = document.offerId || document.id;
+    if (!id) throw new Error('Offer document must include offerId or id');
+    await this.pool.query(
+      'INSERT INTO offers(id, document) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET document = EXCLUDED.document',
+      [id, document]
+    );
+    return document;
+  }
+  async saveLightningWebhook(entry) {
+    await this.pool.query(
+      `INSERT INTO lightning_webhooks(id, provider, event_type, payment_hash, offer_id, payload, headers)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [entry.id, entry.provider, entry.eventType ?? null, entry.paymentHash ?? null, entry.offerId ?? null, entry.payload, entry.headers]
+    );
+    return entry;
+  }
   async idempotent(scope, digest, work) {
     const client = await this.pool.connect();
     try {

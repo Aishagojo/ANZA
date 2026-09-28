@@ -8,6 +8,14 @@ export function createOfferService({ store, verifyEvent, kind, attestorPubkey, n
   const input = (schema, body) => {
     try { validate(schema, body); } catch (error) { throw new HttpError(400, 'VALIDATION_ERROR', error.message); }
   };
+  const normalizeWebhook = body => {
+    const payload = body && typeof body === 'object' ? body : {};
+    const provider = String(payload.provider || payload.source || 'lightning');
+    const eventType = String(payload.eventType || payload.type || payload.event_type || 'payment.received');
+    const paymentHash = String(payload.payment_hash || payload.paymentHash || payload.hash || '');
+    const offerId = String(payload.offerId || payload.offer_id || payload.reference || payload.metadata?.offerId || payload.metadata?.offer_id || '');
+    return { provider, eventType, paymentHash, offerId, payload };
+  };
   return {
     async create({ pubkey, body, key, digest }) {
       input('Terms', body);
@@ -22,11 +30,15 @@ export function createOfferService({ store, verifyEvent, kind, attestorPubkey, n
       });
     },
     async get(id, pubkey) {
-      const offer = await store.getOffer(id);
-      if (!offer || (!['published', 'licensed'].includes(offer.status) && offer.creator_pubkey !== pubkey)) {
+      const stored = await store.getOffer(id);
+      if (!stored) {
         throw new HttpError(404, 'NOT_FOUND', 'Offer not found.');
       }
-      return { status: 200, body: offer };
+      if (stored.offerId) return { status: 200, body: stored };
+      if (!['published', 'licensed'].includes(stored.status) && stored.creator_pubkey !== pubkey) {
+        throw new HttpError(404, 'NOT_FOUND', 'Offer not found.');
+      }
+      return { status: 200, body: stored };
     },
     async publish({ id, pubkey, body, key, digest }) {
       input('SignedEvent', body);
@@ -52,6 +64,30 @@ export function createOfferService({ store, verifyEvent, kind, attestorPubkey, n
         await tx.queueOffer(next, body);
         return { status: 202, body: next };
       });
+    },
+    async createPayment() {
+      throw new HttpError(501, 'PAYMENT_NOT_CONFIGURED', 'Lightning payment integration is not configured yet.');
+    },
+    async getStatus() {
+      throw new HttpError(501, 'PAYMENT_NOT_CONFIGURED', 'Lightning payment integration is not configured yet.');
+    },
+    async lightningWebhook({ body, headers }) {
+      if (!body || typeof body !== 'object') throw new HttpError(400, 'VALIDATION_ERROR', 'Webhook payload must be JSON.');
+      const normalized = normalizeWebhook(body);
+      const entry = {
+        id: randomUUID(),
+        provider: normalized.provider,
+        eventType: normalized.eventType,
+        paymentHash: normalized.paymentHash || null,
+        offerId: normalized.offerId || null,
+        payload: body,
+        headers
+      };
+      await store.saveLightningWebhook(entry);
+      return {
+        status: 202,
+        body: { received: true, provider: entry.provider, eventType: entry.eventType, offerId: entry.offerId || null }
+      };
     }
   };
 }
