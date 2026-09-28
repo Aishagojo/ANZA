@@ -97,14 +97,16 @@ The first milestone is one complete creator-to-brand licensing flow. Event forma
 ```text
 contentport/
 ├── frontend/       # Reserved for the creator and brand interfaces
-├── backend/        # Reserved for APIs and payment/event coordination
+├── backend/        # Day 1 schemas, API contract, Nostr builders, and tests
 └── README.md       # Project overview and initial direction
 ```
 
 > [!NOTE]
-> **Current status: initial setup.** The frontend and backend directories are empty. There is no application code, runnable demo, or installation procedure yet. Features described above are planned.
+> **Current status: backend Day 2 implementation.** Offer API, PostgreSQL storage, signature verification, and queued relay publication code are available alongside the Day 1 contracts. Dependency installation and live database/relay validation remain pending. See the [backend guide](backend/README.md). Frontend and payment integration are not implemented.
 
 ## Open-source development
+
+Local database setup is available through [Docker Compose](backend/docs/local-database.md). Run `docker compose up -d --wait postgres` from this repository to start PostgreSQL with persistent storage.
 
 ContentPort is being prepared for open-source development. Contributions will focus on the core licensing flow, protocol design, payment reliability, accessibility, and feedback from Kenyan creators.
 
