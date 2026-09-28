@@ -20,4 +20,14 @@ CREATE TABLE IF NOT EXISTS nostr_outbox (
   acknowledged_relay text,
   last_error text
 );
+CREATE TABLE IF NOT EXISTS lightning_webhooks (
+  id text PRIMARY KEY,
+  provider text NOT NULL,
+  event_type text,
+  payment_hash text,
+  offer_id text,
+  payload jsonb NOT NULL,
+  headers jsonb NOT NULL,
+  received_at timestamptz NOT NULL DEFAULT now()
+);
 COMMIT;

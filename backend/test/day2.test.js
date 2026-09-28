@@ -23,6 +23,11 @@ function setup(verifyEvent = () => true) {
   const offers = new Map(), requests = new Map(), outbox = [];
   const store = {
     getOffer: async id => offers.get(id),
+    saveOfferDocument: async document => {
+      offers.set(document.offerId || document.id, document);
+      return document;
+    },
+    saveLightningWebhook: async entry => entry,
     async idempotent(scope, digest, work) {
       const prior = requests.get(scope);
       if (prior) {
@@ -99,10 +104,10 @@ function authFixture() {
   const rawBody = Buffer.from(JSON.stringify(terms));
   const key = 'create-key-000001';
   const auth = { ...event(), kind: 27235, content: '', tags: [
-    ['u', 'http://localhost:3000/api/v1/offers'], ['method', 'POST'],
+    ['u', 'http://localhost:3000/api/offers'], ['method', 'POST'],
     ['payload', sha256(rawBody)], ['contentport-idempotency-key', key]
   ] };
-  return { auth, args: { method: 'POST', url: 'http://localhost:3000/api/v1/offers', rawBody,
+  return { auth, args: { method: 'POST', url: 'http://localhost:3000/api/offers', rawBody,
     idempotencyKey: key, now: 1000, verifyEvent: () => true } };
 }
 const header = auth => 'Nostr ' + Buffer.from(JSON.stringify(auth)).toString('base64');
@@ -145,8 +150,8 @@ test('configuration rejects missing keys and insecure non-local relays', () => {
   assert.equal(readConfig(env).kind, 9998);
   assert.throws(() => readConfig({ ...env, NOSTR_OFFER_KIND: '' }));
   assert.throws(() => readConfig({ ...env, NOSTR_RELAYS: 'ws://remote.example' }));
-  assert.equal(matchOfferRoute('POST', '/api/v1/offers').action, 'create');
-  assert.equal(matchOfferRoute('POST', '/api/v1/offers/abc/publish').action, 'publish');
+  assert.equal(matchOfferRoute('POST', '/api/offers').action, 'create');
+  assert.equal(matchOfferRoute('POST', '/api/offers/abc/publish').action, 'publish');
 });
 
 test('HTTP routing returns JSON, validates auth, and creates an offer', async () => {
@@ -163,12 +168,62 @@ test('HTTP routing returns JSON, validates auth, and creates an offer', async ()
   });
   const { auth, args } = authFixture();
   const headers = { 'content-type': 'application/json', 'idempotency-key': args.idempotencyKey };
-  assert.equal((await inject('/api/v1/offers', 'POST', headers, args.rawBody.toString())).status, 401);
-  const created = await inject('/api/v1/offers', 'POST', { ...headers, authorization: header(auth) }, args.rawBody.toString());
+  assert.equal((await inject('/api/offers', 'POST', headers, args.rawBody.toString())).status, 401);
+  const created = await inject('/api/offers', 'POST', { ...headers, authorization: header(auth) }, args.rawBody.toString());
   assert.equal(created.status, 201);
   assert.equal(created.body.creator_pubkey, pubkey);
-  assert.equal((await inject(`/api/v1/offers/${created.body.id}`, 'GET')).status, 404);
-  assert.equal((await inject('/api/v1/payments/test', 'GET')).status, 404);
+  assert.equal((await inject(`/api/offers/${created.body.id}`, 'GET')).status, 404);
+  assert.equal((await inject('/api/payments/test', 'GET')).status, 404);
+  app.close();
+});
+
+test('lightning webhook endpoint accepts Bitnob-style callbacks', async () => {
+  const received = [];
+  const store = {
+    getOffer: async () => undefined,
+    saveOfferDocument: async document => document,
+    saveLightningWebhook: async entry => {
+      received.push(entry);
+      return entry;
+    },
+    async idempotent(scope, digest, work) {
+      return work({
+        insertOffer: async offer => offer,
+        getOfferForUpdate: async () => undefined,
+        queueOffer: async offer => offer
+      });
+    }
+  };
+  const service = createOfferService({ store, verifyEvent: () => true, kind: 9998, attestorPubkey, now: () => 1000 });
+  const app = createApp({ service, verifyEvent: () => true, origin: 'http://localhost:3000', now: () => 1000 });
+  const inject = (url, method, headers = {}, payload = '') => new Promise(resolve => {
+    const request = Readable.from(payload ? [Buffer.from(payload)] : []);
+    Object.assign(request, { url, method, headers });
+    let status;
+    app.emit('request', request, {
+      setHeader() {}, writeHead(code) { status = code; },
+      end(body) { resolve({ status, body: JSON.parse(body) }); }
+    });
+  });
+
+  const payload = JSON.stringify({
+    provider: 'bitnob',
+    type: 'payment.received',
+    payment_hash: 'f'.repeat(64),
+    offerId: 'offer_123',
+    amount_sats: 5000,
+    status: 'settled'
+  });
+
+  const result = await inject('/api/webhooks/lightning', 'POST', { 'content-type': 'application/json' }, payload);
+  assert.equal(result.status, 202);
+  assert.equal(result.body.received, true);
+  assert.equal(result.body.provider, 'bitnob');
+  assert.equal(result.body.eventType, 'payment.received');
+  assert.equal(result.body.offerId, 'offer_123');
+  assert.equal(received.length, 1);
+  assert.equal(received[0].provider, 'bitnob');
+  assert.equal(received[0].paymentHash, 'f'.repeat(64));
   app.close();
 });
 

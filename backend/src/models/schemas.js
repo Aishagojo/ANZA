@@ -10,15 +10,24 @@ const enumeration = (...values) => ({ type: 'string', enum: values });
 const object = (properties) => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 
 export const schemas = {};
-schemas.Terms = object({
-  brand: { ...text, maxLength: 200 },
-  content_url: { type: 'string', pattern: '^https://[^\\s]+$', maxLength: 2048 },
-  content_sha256: hex, amount_sats: positive, usage_rights: text,
-  duration: { oneOf: [
-    object({ type: { const: 'fixed' }, days: { ...positive, maximum: 36500 } }),
-    object({ type: { const: 'perpetual' } })
-  ] }
-});
+schemas.Terms = {
+  type: 'object',
+  properties: {
+    title: { ...text, maxLength: 200 },
+    description: text,
+    brand: { ...text, maxLength: 200 },
+    content_url: { type: 'string', pattern: '^https://[^\\s]+$', maxLength: 2048 },
+    content_sha256: hex,
+    amount_sats: positive,
+    usage_rights: text,
+    duration: { oneOf: [
+      object({ type: { const: 'fixed' }, days: { ...positive, maximum: 36500 } }),
+      object({ type: { const: 'perpetual' } })
+    ] }
+  },
+  required: ['brand', 'content_url', 'content_sha256', 'amount_sats', 'usage_rights', 'duration'],
+  additionalProperties: false
+};
 schemas.Creator = object({ id, nostr_pubkey: hex, wallet_connection_ref: id, created_at: integer });
 schemas.Offer = object({
   id, creator_pubkey: hex, terms: schemas.Terms,
