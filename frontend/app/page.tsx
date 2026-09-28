@@ -11,11 +11,11 @@ import { Button } from "@/components/ui/Button";
  */
 export default function LandingPage() {
   return (
-    <main>
+    <main className="min-h-screen flex flex-col">
       <Navbar />
 
       {/* Hero */}
-      <section className="mx-auto grid max-w-page grid-cols-1 items-center gap-12 px-6 py-16 sm:py-24 lg:grid-cols-2">
+      <section className="mx-auto grid max-w-page grid-cols-1 items-center gap-6 px-6 py-8 lg:grid-cols-2 h-[60vh]">
         <div>
           <h1 className="text-4xl font-bold leading-tight text-text-primary sm:text-5xl">
             License creator content.
@@ -35,27 +35,16 @@ export default function LandingPage() {
         </div>
 
         {/* Right side — sample licensed-content card, matches spec section 8 */}
-        <div className="rounded-xl border border-border bg-white p-5">
-          <div className="mb-4 aspect-video rounded-lg bg-surface" aria-hidden />
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-text-primary">
-                Summer Campaign Video
-              </p>
-              <p className="text-xs text-text-secondary">30-Day Social · 5,000 sats</p>
-            </div>
-            <span className="flex items-center gap-1 rounded-full bg-success-bg px-2.5 py-1 text-xs font-medium text-success">
-              <VerifiedIcon size={12} /> Verifiable on Nostr
-            </span>
-          </div>
+        <div className="rounded-xl border border-border bg-white h-full overflow-hidden">
+          <img src="/images/landing.png" alt="Landing illustration" className="h-full w-full object-cover" />
         </div>
       </section>
 
       {/* How it works */}
       <section id="how-it-works" className="border-t border-border bg-surface">
-        <div className="mx-auto max-w-page px-6 py-16">
-          <h2 className="mb-10 text-2xl font-semibold text-text-primary">How it works</h2>
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mx-auto max-w-page px-6 py-6 h-[30vh]">
+          <h2 className="mb-4 text-lg font-semibold text-text-primary">How it works</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Step
               icon={<FilePlus size={20} />}
               number="01"
@@ -84,7 +73,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <Footer />
+      <div className="mt-auto">
+        <Footer />
+      </div>
     </main>
   );
 }
