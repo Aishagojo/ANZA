@@ -3,11 +3,11 @@
 ## Implemented flow
 
 1. Creator signs HTTP authorization with their Nostr signer.
-2. `POST /api/v1/offers` validates Terms and stores a draft in PostgreSQL. Creator identity comes from the verified authorization key.
+2. `POST /api/offers` validates Terms and stores a draft in PostgreSQL. Creator identity comes from the verified authorization key.
 3. Creator builds and signs the offer using the configured kind and attestor key, matching the saved terms and `contentport-offer-v1` tag.
-4. `POST /api/v1/offers/{id}/publish` verifies the signature, event ID, ownership, terms, and timestamp. A database transaction queues the exact event and changes the offer to `publishing`.
+4. `POST /api/offers/{id}/publish` verifies the signature, event ID, ownership, terms, and timestamp. A database transaction queues the exact event and changes the offer to `publishing`.
 5. The worker sends the event to configured relays. After one matching positive acknowledgement, it marks the offer `published`. Failure leaves it queued with exponential retry delay, capped at five minutes.
-6. `GET /api/v1/offers/{id}` returns the offer. Draft/publishing offers require owner authentication; published offers are public.
+6. `GET /api/offers/{id}` returns the offer. Draft/publishing offers require owner authentication; published offers are public.
 
 POST retries use a persistent idempotency record. Reusing a key with different raw JSON returns `409`; replaying the same request returns its original response. Poll GET for current status. Different publish keys cannot attach a second event to the same offer. The database and outbox survive server restarts.
 
@@ -35,7 +35,7 @@ The server uses Node's HTTP and WebSocket implementations, PostgreSQL through `p
 Day 2 replaces the provisional bearer-session design with signed Nostr HTTP authorization. For every protected request, build an event with kind `27235`, current Unix time, empty content, and these tags:
 
 ```text
-["u", "http://localhost:3000/api/v1/offers"]
+["u", "http://localhost:3000/api/offers"]
 ["method", "POST"]
 ["payload", "<SHA-256 of the exact UTF-8 request body bytes>"]
 ["contentport-idempotency-key", "<same value as Idempotency-Key header>"]

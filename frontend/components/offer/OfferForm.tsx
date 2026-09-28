@@ -84,7 +84,9 @@ export function OfferForm() {
       router.push(`/offers/${res.offerId}`);
     } catch (err) {
       setSubmitError(
-        "Something went wrong publishing this offer. Please try again."
+        err instanceof Error
+          ? err.message
+          : "Something went wrong publishing this offer. Please try again."
       );
       setSubmitting(false);
     }

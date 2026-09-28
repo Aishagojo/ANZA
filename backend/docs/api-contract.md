@@ -1,6 +1,6 @@
 # Day 1: API contract
 
-The machine-readable contract is [openapi.json](openapi.json), generated from [contract.js](../src/contracts/contract.js). Offer routes are implemented for Day 2; payment routes remain planned. See [Day 2 setup](day-2.md). Base path: `/api/v1`. Requests and responses use JSON.
+The machine-readable contract is [openapi.json](openapi.json), generated from [contract.js](../src/contracts/contract.js). Offer routes are implemented for Day 2; payment routes remain planned. See [Day 2 setup](day-2.md). Base path: `/api`. Requests and responses use JSON.
 
 ## Authentication and retries
 
