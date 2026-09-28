@@ -21,7 +21,10 @@ export function Navbar({
   return (
     <header className="border-b border-border bg-white">
       <div className="mx-auto flex max-w-page items-center justify-between px-6 py-4">
-        <Link href="/" className="flex items-center gap-2 font-semibold text-text-primary">
+        <Link
+          href="/"
+          className="flex items-center gap-2 font-semibold text-text-primary"
+        >
           <Radio size={18} className="text-brand" aria-hidden />
           ContentPort
         </Link>
@@ -45,29 +48,35 @@ export function Navbar({
           {!backHref && (
             <>
               <nav className="hidden items-center gap-3 text-sm sm:flex">
-                <a
-                  href="/#how-it-works"
-                  className="text-sm text-text-secondary hover:text-text-primary"
-                >
-                  How it works
-                </a>
                 <Link
-                  href="/offers"
+                  href="/"
                   className="text-sm text-text-secondary hover:text-text-primary"
                 >
-                  Offers
+                  Landing
+                </Link>
+                <Link
+                  href="/create"
+                  className="text-sm text-text-secondary hover:text-text-primary"
+                >
+                  Create Offer
                 </Link>
                 <Link
                   href="/offers/sample-offer"
                   className="text-sm text-text-secondary hover:text-text-primary"
                 >
-                  Example Offer
+                  Public Offer
                 </Link>
                 <Link
                   href="/offers/sample-offer/pay"
                   className="text-sm text-text-secondary hover:text-text-primary"
                 >
-                  Pay
+                  Payment
+                </Link>
+                <Link
+                  href="/licensed-confirmation"
+                  className="text-sm text-text-secondary hover:text-text-primary"
+                >
+                  Licensed Confirmation
                 </Link>
               </nav>
 
