@@ -108,7 +108,7 @@ export default function PaymentPage({ params }: { params: { offerId: string } })
   return (
     <main>
       <Navbar backHref={`/offers/${offer.offerId}`} />
-      <div className="mx-auto max-w-4xl px-6 py-10">
+      <div className="mx-auto max-w-6xl px-6 py-10">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
           {/* LEFT: license summary */}
           <div>
@@ -116,51 +116,70 @@ export default function PaymentPage({ params }: { params: { offerId: string } })
               <ContentPreview url={offer.contentUrl} title={offer.title} size="small" />
               <div>
                 <p className="font-semibold text-text-primary">{offer.title}</p>
-                <p className="text-sm text-text-secondary">
-                  {LICENSE_TYPE_LABELS[offer.licenseType]} License
-                </p>
+                <p className="text-sm text-text-secondary mt-1">{LICENSE_TYPE_LABELS[offer.licenseType]} License</p>
               </div>
             </div>
 
-            <div className="mt-6 rounded-lg bg-surface p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                Amount
-              </p>
-              <p className="mt-1 text-2xl font-bold text-text-primary">
-                {payment.amountSats.toLocaleString()} sats
-              </p>
+            <div className="mt-6 rounded-lg bg-white border border-border p-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Amount</p>
+              <div className="mt-2 flex items-center gap-3">
+                <span className="text-2xl text-yellow-500">₿</span>
+                <p className="text-3xl font-bold text-text-primary">{payment.amountSats.toLocaleString()} sats</p>
+              </div>
             </div>
 
-            <div className="mt-6 space-y-3">
-              <p className="flex items-center gap-2 text-sm font-medium text-text-primary">
-                <ShieldCheck size={16} className="text-brand" /> Secure & fast
-              </p>
-              <p className="text-sm text-text-secondary">
-                Powered by Bitcoin Lightning for instant, low-cost payments.
-              </p>
-            </div>
+            <Card className="mt-6">
+              <h3 className="mb-2 text-sm font-semibold text-text-primary">Secure & Fast</h3>
+              <p className="mb-4 text-sm text-text-secondary">Powered by Bitcoin Lightning for instant, low-cost payments.</p>
+
+              <ol className="space-y-4">
+                <li className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-sm font-semibold">1</div>
+                  <div>
+                    <p className="font-semibold text-sm text-text-primary">You pay</p>
+                    <p className="text-sm text-text-secondary">Scan the QR code or copy the invoice.</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-sm font-semibold">2</div>
+                  <div>
+                    <p className="font-semibold text-sm text-text-primary">We verify</p>
+                    <p className="text-sm text-text-secondary">Payment is confirmed on the Lightning network.</p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-sm font-semibold">3</div>
+                  <div>
+                    <p className="font-semibold text-sm text-text-primary">License is recorded</p>
+                    <p className="text-sm text-text-secondary">A Nostr event is created and published.</p>
+                  </div>
+                </li>
+              </ol>
+            </Card>
           </div>
 
           {/* RIGHT: payment instructions */}
           <Card>
-            <h2 className="mb-1 text-lg font-semibold text-text-primary">
-              Pay with Bitcoin Lightning
-            </h2>
-            <p className="mb-6 text-sm text-text-secondary">
-              Fast, low-cost payment using the Lightning Network.
-            </p>
-
-            <div className="flex justify-center">
-              <LightningQR paymentRequest={payment.paymentRequest} />
+            <div>
+              <h2 className="mb-1 text-lg font-semibold text-text-primary">Pay with Bitcoin Lightning</h2>
+              <p className="mb-6 text-sm text-text-secondary">Fast, low-cost payment using the Lightning Network.</p>
             </div>
 
-            <div className="mt-6">
-              <InvoiceDisplay paymentRequest={payment.paymentRequest} />
+            <div className="rounded-lg border border-border bg-surface p-4">
+              <div className="flex justify-center">
+                <LightningQR paymentRequest={payment.paymentRequest} />
+              </div>
+
+              <div className="mt-4">
+                <InvoiceDisplay paymentRequest={payment.paymentRequest} />
+              </div>
             </div>
 
             <div className="mt-6">
               <PaymentStatus confirmed={confirmed} offerId={offer.offerId} />
             </div>
+
+            
           </Card>
         </div>
       </div>
