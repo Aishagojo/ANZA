@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { FilePlus, Radio, Zap, ShieldCheck, ShieldCheck as VerifiedIcon } from "lucide-react";
+import {
+  FilePlus,
+  Radio,
+  Zap,
+  ShieldCheck,
+  ShieldCheck as VerifiedIcon,
+} from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/Button";
@@ -36,14 +42,20 @@ export default function LandingPage() {
 
         {/* Right side — sample licensed-content card, matches spec section 8 */}
         <div className="rounded-xl border border-border bg-white h-full overflow-hidden">
-          <img src="/images/landing.png" alt="Landing illustration" className="h-full w-full object-cover" />
+          <img
+            src="/images/landing.png"
+            alt="Landing illustration"
+            className="h-full w-full object-cover"
+          />
         </div>
       </section>
 
       {/* How it works */}
       <section id="how-it-works" className="border-t border-border bg-surface">
         <div className="mx-auto max-w-page px-6 py-6 h-[30vh]">
-          <h2 className="mb-4 text-lg font-semibold text-text-primary">How it works</h2>
+          <h2 className="mb-4 text-lg font-semibold text-text-primary">
+            How it works
+          </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Step
               icon={<FilePlus size={20} />}
