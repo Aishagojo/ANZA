@@ -1,3 +1,8 @@
+/*
+  Navbar component — renders the global top navigation used across
+  the app. Includes links to landing, create, offers and demo pages,
+  and optional back/verified indicators.
+*/
 import Link from "next/link";
 import { ArrowLeft, ShieldCheck, Radio } from "lucide-react";
 import { Button } from "@/components/ui/Button";

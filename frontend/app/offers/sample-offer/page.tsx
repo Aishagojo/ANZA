@@ -1,3 +1,9 @@
+/*
+  Demo public offer page (static)
+  A lightweight static page used for UI demos. Uses mock data and the
+  client-only `ContentPreviewDemo` so YouTube shorts autoplay works in
+  the demo without affecting production routes.
+*/
 import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
 import { Card } from "@/components/ui/Card";

@@ -1,5 +1,11 @@
 "use client";
 
+/*
+  ContentPreviewDemo (client)
+  Client-only preview used on demo/mock pages. Embeds YouTube/shorts
+  as an autoplaying, muted iframe with an Unmute control. Keeps demo
+  behaviour isolated from server-rendered production components.
+*/
 import { useMemo, useState } from "react";
 
 export function ContentPreviewDemo({

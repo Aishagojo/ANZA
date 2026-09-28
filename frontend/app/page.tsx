@@ -1,3 +1,9 @@
+/*
+  Landing page
+  The app's public landing screen. Contains a hero, condensed "How it works"
+  section, and a sample content card. Optimized to fit within the viewport
+  for demo purposes.
+*/
 import Link from "next/link";
 import {
   FilePlus,

@@ -1,3 +1,8 @@
+/*
+  Demo payment page for the sample offer.
+  Mirrors the real payment UI but uses mock invoice data so the demo
+  flow can be shown without backend integration.
+*/
 import { Navbar } from "@/components/layout/Navbar";
 import { Card } from "@/components/ui/Card";
 import { ContentPreview } from "@/components/offer/ContentPreview";

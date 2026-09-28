@@ -1,3 +1,8 @@
+/*
+  Licensed confirmation demo page
+  Displays a confirmed license summary with public verification details.
+  This static demo mirrors the real licensed view for visual testing.
+*/
 import { CheckCircle, Calendar } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Card } from "@/components/ui/Card";
