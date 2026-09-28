@@ -1,0 +1,14 @@
+{
+  "name": "@contentport/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node --env-file=.env src/server.js",
+    "migrate": "node --env-file=.env scripts/migrate.js",
+    "test": "node --test",
+    "contracts": "node scripts/export-contract.js"
+  },
+  "dependencies": { "ajv": "^8.17.1", "nostr-tools": "^2.0.0", "pg": "^8.0.0" }
+}
