@@ -10,9 +10,8 @@ export function matchOfferRoute(method, pathname) {
 }
 
 export function matchWebhookRoute(method, pathname) {
-  if (method !== 'POST') return null;
-  if (pathname === '/api/webhooks/lightning' || pathname === '/api/webhooks/bitnob/lightning') {
-    return { action: 'lightningWebhook', auth: false };
+  if (method === 'POST' && (pathname === '/api/webhooks/lightning' || pathname === '/api/webhooks/speed/lightning')) {
+    return { action: 'lightningWebhook', auth: false, provider: 'speed' };
   }
   return null;
 }

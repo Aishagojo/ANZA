@@ -14,6 +14,7 @@ type BackendOffer = {
   };
   status: "draft" | "publishing" | "published" | "licensed";
   event_id: string | null;
+  payment?: { status?: "pending" | "settled" };
 };
 
 function idempotencyKey() { return crypto.randomUUID().replaceAll("-", ""); }
@@ -50,7 +51,8 @@ function fromBackend(offer: BackendOffer): Offer {
   const type = licenseType(offer.terms.duration);
   return { offerId: offer.id, title: offer.terms.title || "Untitled Content", description: offer.terms.description || offer.terms.usage_rights,
     contentUrl: offer.terms.content_url, brandName: offer.terms.brand, priceSats: offer.terms.amount_sats,
-    licenseType: type, licenseDescription: offer.terms.usage_rights, status: offer.status === "licensed" ? "LICENSED" : "OPEN",
+    licenseType: type, licenseDescription: offer.terms.usage_rights,
+    status: offer.status === "licensed" ? "LICENSED" : offer.payment?.status === "settled" ? "PAYMENT_SETTLED" : offer.payment?.status === "pending" ? "PAYMENT_PENDING" : "OPEN",
     nostrEventId: offer.event_id ?? "Pending relay acknowledgement",
     creatorHandle: `${offer.creator_pubkey.slice(0, 8)}…${offer.creator_pubkey.slice(-6)}` };
 }
@@ -78,10 +80,14 @@ export async function getOffer(offerId: string): Promise<Offer> {
   if (!response.ok) throw new Error(await errorMessage(response));
   return fromBackend(await response.json() as BackendOffer);
 }
-export async function createPaymentRequest(_offerId: string): Promise<PaymentRequestResponse> {
-  throw new Error("Lightning payment integration is not connected yet.");
+export async function createPaymentRequest(offerId: string): Promise<PaymentRequestResponse> {
+  const response = await fetch(apiUrl(`/offers/${offerId}/payment`), { method: "POST", headers: { "Content-Type": "application/json" } });
+  if (!response.ok) throw new Error(await errorMessage(response));
+  return response.json() as Promise<PaymentRequestResponse>;
 }
-export async function getOfferStatus(_offerId: string): Promise<OfferStatusResponse> {
-  throw new Error("Lightning payment integration is not connected yet.");
+export async function getOfferStatus(offerId: string): Promise<OfferStatusResponse> {
+  const response = await fetch(apiUrl(`/offers/${offerId}/status`));
+  if (!response.ok) throw new Error(await errorMessage(response));
+  return response.json() as Promise<OfferStatusResponse>;
 }
 export { LICENSE_TYPE_LABELS, LICENSE_TYPE_DESCRIPTIONS };
