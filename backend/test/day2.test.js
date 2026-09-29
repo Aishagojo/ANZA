@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { createHmac } from 'node:crypto';
+import { nip19 } from 'nostr-tools';
 import { createOfferService } from '../src/services/offers/service.js';
 import { buildOfferEvent } from '../src/services/nostr/events.js';
 import { createRelayPublisher } from '../src/services/nostr/publisher.js';
@@ -19,7 +21,7 @@ const event = () => ({ ...buildOfferEvent({ kind: 9998, creatorPubkey: pubkey, a
   id: 'd'.repeat(64), sig: 'e'.repeat(128) });
 
 // In-memory test double only; production always uses PostgreSQL.
-function setup(verifyEvent = () => true) {
+function setup(verifyEvent = () => true, paymentProvider = null) {
   const offers = new Map(), requests = new Map(), outbox = [];
   const store = {
     getOffer: async id => offers.get(id),
@@ -43,7 +45,7 @@ function setup(verifyEvent = () => true) {
       return result;
     }
   };
-  return { offers, outbox, service: createOfferService({ store, verifyEvent, kind: 9998, attestorPubkey, now: () => 1000 }) };
+  return { offers, outbox, service: createOfferService({ store, verifyEvent, kind: 9998, attestorPubkey, speedWebhookSecret: 'test-webhook-secret', paymentProvider, now: () => 1000 }) };
 }
 const create = service => service.create({ pubkey, body: terms, key: 'create-key-000001', digest: 'create-digest' });
 const publish = (service, id, body = event()) => service.publish({ id, pubkey, body, key: 'publish-key-0001', digest: JSON.stringify(body) });
@@ -59,6 +61,55 @@ test('create validates input, assigns creator, and replays the saved result', as
   await assert.rejects(service.create({ pubkey, body: { ...terms, amount_sats: 1 }, key: 'create-key-000001', digest: 'changed' }), { status: 409 });
   await assert.rejects(service.create({ body: { ...terms, amount_sats: -1 } }), { status: 400 });
   await assert.rejects(service.create({ body: { ...terms, content_url: 'https://user:password@example.com/' } }), { status: 400 });
+});
+test('payment requests a Polar LND invoice at the saved offer price and reuses an unexpired invoice', async () => {
+  const invoices = [];
+  const provider = { createInvoice: async input => {
+    invoices.push(input);
+    return { id: 'invoice-1', payment_hash: 'f'.repeat(64), request: 'lnbc1paymentrequest', amount_sat: '500', status: 'pending', expires_at: 4600 };
+  } };
+  const { service, offers } = setup(() => true, provider);
+  const { body } = await create(service);
+  offers.set(body.id, { ...body, status: 'published' });
+  const payment = await service.createPayment(body.id);
+  assert.equal(payment.status, 201);
+  assert.deepEqual(payment.body, { offerId: body.id, amountSats: 500, paymentRequest: 'lnbc1paymentrequest' });
+  assert.deepEqual(invoices, [{ amountSats: 500, description: 'ContentPort license: ' + body.id, expiry: 3600, reference: 'contentport_' + body.id }]);
+  assert.equal((await service.createPayment(body.id)).status, 200);
+  assert.equal(invoices.length, 1);
+  assert.deepEqual((await service.getStatus(body.id)).body, { offerId: body.id, status: 'PAYMENT_PENDING' });
+});
+test('payment replaces an expired pending Lightning invoice', async () => {
+  let calls = 0;
+  const provider = { createInvoice: async () => {
+    calls += 1;
+    return { id: `invoice-${calls}`, payment_hash: String(calls).repeat(64), request: `lnbc1fresh${calls}`,
+      amount_sat: 500, status: 'pending', expires_at: 4600 };
+  } };
+  const { service, offers } = setup(() => true, provider);
+  const { body } = await create(service);
+  offers.set(body.id, { ...body, status: 'published', payment: {
+    status: 'pending', amount_sats: 500, request: 'lnbc1expired', expires_at: 999
+  } });
+  const result = await service.createPayment(body.id);
+  assert.equal(result.status, 201);
+  assert.equal(result.body.paymentRequest, 'lnbc1fresh1');
+  assert.equal(calls, 1);
+});
+test('status records a Polar LND settlement before reporting it to the frontend', async () => {
+  const provider = { lookupInvoice: async hash => {
+    assert.equal(hash, 'f'.repeat(64));
+    return { status: 'settled', settled_at: 1200 };
+  } };
+  const { service, offers } = setup(() => true, provider);
+  const { body } = await create(service);
+  offers.set(body.id, { ...body, status: 'published', payment: {
+    provider: 'polar-lnd', payment_hash: 'f'.repeat(64), status: 'pending', amount_sats: 500, request: 'lnbc1paymentrequest'
+  } });
+  assert.deepEqual((await service.getStatus(body.id)).body, {
+    offerId: body.id, status: 'PAYMENT_SETTLED', paymentSettledAt: 1200
+  });
+  assert.equal(offers.get(body.id).payment.status, 'settled');
 });
 test('draft reads require the owner; published offers are public', async () => {
   const { service, offers } = setup();
@@ -148,6 +199,8 @@ test('relay rejection and missing acknowledgements fail; another relay can succe
 test('configuration rejects missing keys and insecure non-local relays', () => {
   const env = { DATABASE_URL: 'postgresql://localhost/test', NOSTR_OFFER_KIND: '9998', NOSTR_ATTESTOR_PUBKEY: attestorPubkey, NOSTR_RELAYS: 'ws://localhost:7777' };
   assert.equal(readConfig(env).kind, 9998);
+  assert.equal(readConfig({ ...env, NOSTR_ATTESTOR_PUBKEY: nip19.npubEncode(attestorPubkey) }).attestorPubkey, attestorPubkey);
+
   assert.throws(() => readConfig({ ...env, NOSTR_OFFER_KIND: '' }));
   assert.throws(() => readConfig({ ...env, NOSTR_RELAYS: 'ws://remote.example' }));
   assert.equal(matchOfferRoute('POST', '/api/offers').action, 'create');
@@ -177,56 +230,46 @@ test('HTTP routing returns JSON, validates auth, and creates an offer', async ()
   app.close();
 });
 
-test('lightning webhook endpoint accepts Bitnob-style callbacks', async () => {
+test('lightning webhook endpoint accepts signed Speed callbacks', async () => {
   const received = [];
   const store = {
     getOffer: async () => undefined,
     saveOfferDocument: async document => document,
-    saveLightningWebhook: async entry => {
-      received.push(entry);
-      return entry;
-    },
+    saveLightningWebhook: async entry => { received.push(entry); return entry; },
     async idempotent(scope, digest, work) {
-      return work({
-        insertOffer: async offer => offer,
-        getOfferForUpdate: async () => undefined,
-        queueOffer: async offer => offer
-      });
+      return work({ insertOffer: async offer => offer, getOfferForUpdate: async () => undefined, queueOffer: async offer => offer });
     }
   };
-  const service = createOfferService({ store, verifyEvent: () => true, kind: 9998, attestorPubkey, now: () => 1000 });
+  const secret = 'wsec_c3BlZWQtd2ViaG9vay1zZWNyZXQ=';
+  const service = createOfferService({ store, verifyEvent: () => true, kind: 9998, attestorPubkey, speedWebhookSecret: secret, now: () => 1000 });
   const app = createApp({ service, verifyEvent: () => true, origin: 'http://localhost:3000', now: () => 1000 });
   const inject = (url, method, headers = {}, payload = '') => new Promise(resolve => {
     const request = Readable.from(payload ? [Buffer.from(payload)] : []);
     Object.assign(request, { url, method, headers });
     let status;
-    app.emit('request', request, {
-      setHeader() {}, writeHead(code) { status = code; },
-      end(body) { resolve({ status, body: JSON.parse(body) }); }
-    });
+    app.emit('request', request, { setHeader() {}, writeHead(code) { status = code; }, end(body) { resolve({ status, body: JSON.parse(body) }); } });
   });
-
   const payload = JSON.stringify({
-    provider: 'bitnob',
-    type: 'payment.received',
-    payment_hash: 'f'.repeat(64),
-    offerId: 'offer_123',
-    amount_sats: 5000,
-    status: 'settled'
+    event_type: 'payment.paid',
+    data: { object: { id: 'pi_123', metadata: { offer_id: 'contentport_offer_123' }, payment_method_options: { lightning: { id: 'lni_123' } } } }
   });
-
-  const result = await inject('/api/webhooks/lightning', 'POST', { 'content-type': 'application/json' }, payload);
-  assert.equal(result.status, 202);
+  const id = 'msg_123';
+  const timestamp = '1000';
+  const signature = createHmac('sha256', Buffer.from('c3BlZWQtd2ViaG9vay1zZWNyZXQ=', 'base64'))
+    .update(`${id}.${timestamp}.${payload}`).digest('base64');
+  assert.equal((await inject('/api/webhooks/lightning', 'POST', { 'content-type': 'application/json' }, payload)).status, 401);
+  assert.equal((await inject('/api/webhooks/lightning', 'POST', { 'content-type': 'application/json', 'webhook-id': id, 'webhook-timestamp': timestamp, 'webhook-signature': 'v1,bad' }, payload)).status, 401);
+  const result = await inject('/api/webhooks/speed/lightning', 'POST', { 'content-type': 'application/json', 'webhook-id': id, 'webhook-timestamp': timestamp, 'webhook-signature': `v1,${signature}` }, payload);
+  assert.equal(result.status, 200);
   assert.equal(result.body.received, true);
-  assert.equal(result.body.provider, 'bitnob');
-  assert.equal(result.body.eventType, 'payment.received');
+  assert.equal(result.body.provider, 'speed');
+  assert.equal(result.body.eventType, 'payment.paid');
   assert.equal(result.body.offerId, 'offer_123');
   assert.equal(received.length, 1);
-  assert.equal(received[0].provider, 'bitnob');
-  assert.equal(received[0].paymentHash, 'f'.repeat(64));
+  assert.equal(received[0].provider, 'speed');
+  assert.equal(received[0].paymentHash, 'lni_123');
   app.close();
 });
-
 test('real Nostr signature verification (requires installed nostr-tools)', async t => {
   let tools;
   try { tools = await import('nostr-tools/pure'); }

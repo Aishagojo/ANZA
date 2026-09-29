@@ -51,7 +51,7 @@ export function createApp({ service, verifyEvent, origin, corsOrigin = null, now
         try { body = JSON.parse(rawBody.toString('utf8')); } catch { throw new HttpError(400, 'VALIDATION_ERROR', 'Invalid JSON.'); }
       }
       if (route.action === 'lightningWebhook') {
-        const result = await controller.lightningWebhook({ body, headers: request.headers, rawBody, digest: sha256(rawBody) });
+        const result = await controller.lightningWebhook({ body, headers: request.headers, rawBody, digest: sha256(rawBody), provider: route.provider });
         response.writeHead(result.status);
         response.end(JSON.stringify(result.body));
         return;
