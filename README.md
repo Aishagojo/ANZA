@@ -68,7 +68,7 @@ flowchart LR
 | Lightning invoice | ✅ | Creates a BOLT11 invoice from the offer's exact sats amount through a local Polar LND Creator node. |
 | Lightning settlement detection | ✅ | Looks up the invoice at LND and updates the UI only after LND reports settlement. |
 | Payment QR and status UI | ✅ | Shows the price, Lightning QR/invoice, pending state, and confirmed payment state. |
-| Signed Nostr license event after payment | 🟡 | Event format and validation are defined; automatic signing and publishing after settlement is the next integration step. |
+| Signed Nostr license event after payment | ✅ | After verified Lightning settlement, ContentPort signs a linked license event, queues it for relay publication, and records the license after relay acknowledgement. |
 
 ## Why this matters
 
@@ -259,7 +259,6 @@ contentport/
 
 ## Roadmap
 
-- [ ] Automatically sign and publish the linked Nostr license event after verified settlement.
 - [ ] Add protected original-file delivery with one-time download access.
 - [ ] Support public testnet/mainnet Lightning with production-grade TLS, wallet permissions, and operational controls.
 - [ ] Add buyer acceptance and brand identity workflows.
