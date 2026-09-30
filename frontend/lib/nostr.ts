@@ -28,6 +28,58 @@ function signer(): NostrExtension {
   return window.nostr;
 }
 
+/**
+ * Result of probing the injected NIP-07 signer.
+ *
+ * - "missing"  no extension injected the API into this page
+ * - "locked"   extension present but getPublicKey() failed or never answered,
+ *              which in practice means locked, or no account/keys set up yet
+ * - "connected" extension returned a usable public key
+ */
+export type SignerProbe =
+  | { status: "missing" }
+  | { status: "locked" }
+  | { status: "connected"; pubkey: string };
+
+const SIGNER_PROBE_TIMEOUT_MS = 2500;
+
+/**
+ * Probes the injected NIP-07 signer.
+ *
+ * getPublicKey() on a locked extension can stay pending indefinitely, so the
+ * call is raced against a timeout. Without this the caller would wait forever
+ * and never be able to tell the user what is wrong.
+ */
+export async function probeSigner(
+  timeoutMs: number = SIGNER_PROBE_TIMEOUT_MS
+): Promise<SignerProbe> {
+  if (typeof window === "undefined" || !window.nostr) return { status: "missing" };
+
+  let timer: ReturnType<typeof setTimeout>;
+  const expired = Symbol("timeout");
+  const timeout = new Promise<typeof expired>((resolve) => {
+    timer = setTimeout(() => resolve(expired), timeoutMs);
+  });
+
+  // A rejection is treated the same as a timeout: the extension is there but
+  // not usable, and the banner will tell the user how to unlock it.
+  const query = window.nostr
+    .getPublicKey()
+    .then((pubkey) => ({ pubkey }))
+    .catch(() => ({ pubkey: null as string | null }));
+
+  try {
+    const result = await Promise.race([query, timeout]);
+    if (result === expired) return { status: "locked" };
+    const pubkey = (result as { pubkey: string | null }).pubkey;
+    return typeof pubkey === "string" && /^[0-9a-f]{64}$/.test(pubkey)
+      ? { status: "connected", pubkey }
+      : { status: "locked" };
+  } finally {
+    clearTimeout(timer!);
+  }
+}
+
 export async function sha256Hex(value: string): Promise<string> {
   const bytes = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest("SHA-256", bytes);

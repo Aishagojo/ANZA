@@ -21,5 +21,18 @@ services:
       retries: 12
       start_period: 10s
 
+  # Local Nostr relay for development. Accepts every event: no auth, no limits.
+  # Matches NOSTR_RELAYS in backend/.env (ws://localhost:7777).
+  strfry:
+    image: dockurr/strfry:latest
+    container_name: contentport-strfry
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7777:7777"
+    volumes:
+      - strfry_data:/app/strfry-db
+      - ./strfry.conf:/etc/strfry.conf:ro
+
 volumes:
   postgres_data:
+  strfry_data:
