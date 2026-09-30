@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { createHmac } from 'node:crypto';
-import { nip19 } from 'nostr-tools';
+import { nip19, generateSecretKey, getPublicKey } from 'nostr-tools';
 import { createOfferService } from '../src/services/offers/service.js';
 import { buildOfferEvent } from '../src/services/nostr/events.js';
 import { createRelayPublisher } from '../src/services/nostr/publisher.js';
@@ -19,15 +19,35 @@ const terms = { brand: 'Example', content_url: 'https://example.com/video', cont
   amount_sats: 500, usage_rights: 'Organic social use only', duration: { type: 'fixed', days: 30 } };
 const event = () => ({ ...buildOfferEvent({ kind: 9998, creatorPubkey: pubkey, attestorPubkey, terms, createdAt: 1000 }),
   id: 'd'.repeat(64), sig: 'e'.repeat(128) });
+// Real keypair, so config tests exercise the same nsec/hex paths as production.
+const generateKeypair = () => {
+  const sk = Buffer.from(generateSecretKey()).toString('hex');
+  return { sk, pk: getPublicKey(Buffer.from(sk, 'hex')) };
+};
 
 // In-memory test double only; production always uses PostgreSQL.
-function setup(verifyEvent = () => true, paymentProvider = null) {
-  const offers = new Map(), requests = new Map(), outbox = [];
+function setup(verifyEvent = () => true, paymentProvider = null, options = {}) {
+  const offers = new Map(), requests = new Map(), outbox = [], licenses = new Map();
   const store = {
     getOffer: async id => offers.get(id),
+    getOfferEvent: async id => outbox.find(entry => entry.role === 'offer' && entry.offerId === id)?.event,
+    // Mirrors the targeted jsonb_set on {payment}: a full-document save here
+    // would hide the clobber bug this exists to guard against.
+    savePaymentState: async (id, payment) => {
+      const current = offers.get(id);
+      if (current) offers.set(id, { ...current, payment });
+      return current;
+    },
     saveOfferDocument: async document => {
       offers.set(document.offerId || document.id, document);
       return document;
+    },
+    getLicense: async offerId => [...licenses.values()].find(license => license.offerId === offerId) || null,
+    createLicense: async ({ id, offerId, paymentId, startsAt, endsAt }) => {
+      licenses.set(id, { id, offerId, paymentId, starts_at: startsAt, ends_at: endsAt, publication_status: 'pending', event_id: null });
+    },
+    queueLicenseEvent: async ({ eventId, offerId, licenseId, event }) => {
+      outbox.push({ role: 'license', eventId, offerId, licenseId, event });
     },
     saveLightningWebhook: async entry => entry,
     async idempotent(scope, digest, work) {
@@ -39,15 +59,15 @@ function setup(verifyEvent = () => true, paymentProvider = null) {
       const result = await work({
         insertOffer: async offer => offers.set(offer.id, offer),
         getOfferForUpdate: async id => offers.get(id),
-        queueOffer: async (offer, signed) => { offers.set(offer.id, offer); outbox.push(signed); }
+        queueOffer: async (offer, signed) => { offers.set(offer.id, offer); outbox.push({ role: 'offer', offerId: offer.id, event: signed }); }
       });
       requests.set(scope, { digest, result });
       return result;
     }
   };
-  return { offers, outbox, service: createOfferService({ store, verifyEvent, kind: 9998, attestorPubkey, speedWebhookSecret: 'test-webhook-secret', paymentProvider, now: () => 1000 }) };
+  return { offers, outbox, licenses, service: createOfferService({ store, verifyEvent, kind: 9998, attestorPubkey, speedWebhookSecret: 'test-webhook-secret', paymentProvider, now: () => 1000, ...options }) };
 }
-const create = service => service.create({ pubkey, body: terms, key: 'create-key-000001', digest: 'create-digest' });
+const create = (service, body = terms) => service.create({ pubkey, body, key: 'create-key-000001', digest: 'create-digest' });
 const publish = (service, id, body = event()) => service.publish({ id, pubkey, body, key: 'publish-key-0001', digest: JSON.stringify(body) });
 
 test('create validates input, assigns creator, and replays the saved result', async () => {
@@ -111,6 +131,113 @@ test('status records a Polar LND settlement before reporting it to the frontend'
   });
   assert.equal(offers.get(body.id).payment.status, 'settled');
 });
+test('a settled offer queues one signed license event and does not re-sign on later polls', async () => {
+  const provider = { lookupInvoice: async () => ({ status: 'settled', settled_at: 1200 }) };
+  const signed = [];
+  const signEvent = async (template, secretKey) => {
+    signed.push({ template, secretKey });
+    return { ...template, id: 'c'.repeat(64), sig: 'f'.repeat(128) };
+  };
+  const attestorSecretKey = 'b'.repeat(64);
+  const { service, offers, outbox, licenses } = setup(() => true, provider, {
+    licenseKind: 9999, attestorSecretKey, signEvent
+  });
+  const { body } = await create(service);
+  await publish(service, body.id);
+  offers.set(body.id, { ...offers.get(body.id), status: 'published', payment: {
+    provider: 'polar-lnd', payment_hash: 'f'.repeat(64), status: 'pending', amount_sats: 500, request: 'lnbc1paymentrequest'
+  } });
+
+  assert.equal((await service.getStatus(body.id)).body.status, 'PAYMENT_SETTLED');
+  assert.equal(signed.length, 1);
+  assert.equal(signed[0].secretKey, attestorSecretKey);
+  assert.equal(signed[0].template.kind, 9999);
+  assert.equal(signed[0].template.pubkey, attestorPubkey);
+
+  // The license references the published offer and carries the duration the
+  // publisher derived from settlement time.
+  const template = signed[0].template;
+  const payload = JSON.parse(template.content);
+  assert.equal(template.tags[0][0], 'e');
+  assert.equal(template.tags[0][1], event().id);
+  assert.equal(template.tags[2][1], 'contentport-license-v1');
+  assert.equal(payload.amount_sats, 500);
+  assert.equal(payload.starts_at, 1200);
+  assert.equal(payload.ends_at, 1200 + 30 * 86400);
+  assert.equal(outbox.filter(entry => entry.role === 'license').length, 1);
+  assert.equal(licenses.size, 1);
+
+  // Polling is the normal path, so a repeat must not sign or queue again.
+  await service.getStatus(body.id);
+  assert.equal(signed.length, 1);
+  assert.equal(outbox.filter(entry => entry.role === 'license').length, 1);
+});
+test('a perpetual license never receives an expiry', async () => {
+  const provider = { lookupInvoice: async () => ({ status: 'settled', settled_at: 1200 }) };
+  const signed = [];
+  const signEvent = async template => { signed.push(template); return { ...template, id: 'c'.repeat(64), sig: 'f'.repeat(128) }; };
+  const { service, offers } = setup(() => true, provider, { licenseKind: 9999, attestorSecretKey: 'b'.repeat(64), signEvent });
+  const perpetual = { ...terms, duration: { type: 'perpetual' } };
+  const { body } = await create(service, perpetual);
+  await publish(service, body.id, { ...buildOfferEvent({ kind: 9998, creatorPubkey: pubkey, attestorPubkey, terms: perpetual, createdAt: 1000 }),
+    id: 'd'.repeat(64), sig: 'e'.repeat(128) });
+  offers.set(body.id, { ...offers.get(body.id), status: 'published', payment: {
+    provider: 'polar-lnd', payment_hash: 'f'.repeat(64), status: 'pending', amount_sats: 500, request: 'lnbc1paymentrequest'
+  } });
+  await service.getStatus(body.id);
+  assert.equal(signed.length, 1);
+  assert.equal(JSON.parse(signed[0].content).ends_at, null);
+});
+test('a settlement that disagrees with the published offer is refused, not attested', async () => {
+  const provider = { lookupInvoice: async () => ({ status: 'settled', settled_at: 1200 }) };
+  const signed = [];
+  const { service, offers } = setup(() => true, provider, {
+    licenseKind: 9999, attestorSecretKey: 'b'.repeat(64), signEvent: async t => { signed.push(t); return t; }
+  });
+  const { body } = await create(service);
+  await publish(service, body.id);
+  // The offer on record is for 500 sats, but the invoice settled at 5000.
+  offers.set(body.id, { ...offers.get(body.id), status: 'published', payment: {
+    provider: 'polar-lnd', payment_hash: 'f'.repeat(64), status: 'pending', amount_sats: 5000, request: 'lnbc1paymentrequest'
+  } });
+  await assert.rejects(service.getStatus(body.id), { status: 500, code: 'LICENSE_BUILD_FAILED' });
+  assert.equal(signed.length, 0);
+});
+test('a settled offer without an attestor key stays settled and issues no license', async () => {
+  const provider = { lookupInvoice: async () => ({ status: 'settled', settled_at: 1200 }) };
+  const { service, offers, outbox } = setup(() => true, provider);
+  const { body } = await create(service);
+  offers.set(body.id, { ...body, status: 'published', payment: {
+    provider: 'polar-lnd', payment_hash: 'f'.repeat(64), status: 'pending', amount_sats: 500, request: 'lnbc1paymentrequest'
+  } });
+  assert.equal((await service.getStatus(body.id)).body.status, 'PAYMENT_SETTLED');
+  assert.equal(outbox.filter(entry => entry.role === 'license').length, 0);
+});
+test('the attestor secret is accepted as an nsec and must match the attestor pubkey', () => {
+  // nip19 returns raw bytes for an nsec, so config must convert before use.
+  const { sk, pk } = generateKeypair();
+  const nsec = nip19.nsecEncode(Uint8Array.from(Buffer.from(sk, 'hex')));
+  const env = { DATABASE_URL: 'postgresql://localhost/test', NOSTR_OFFER_KIND: '9998', NOSTR_RELAYS: 'ws://localhost:7777' };
+  assert.equal(readConfig({ ...env, NOSTR_ATTESTOR_PUBKEY: pk, NOSTR_ATTESTOR_SECRET: nsec }).attestorSecretKey, sk);
+  assert.equal(readConfig({ ...env, NOSTR_ATTESTOR_PUBKEY: pk, NOSTR_ATTESTOR_SECRET: sk }).attestorSecretKey, sk);
+  assert.equal(readConfig({ ...env, NOSTR_ATTESTOR_PUBKEY: pk }).attestorSecretKey, null);
+  // A key that does not match the advertised attestor would sign under a
+  // different identity than offers reference, so it must fail loudly.
+  const other = generateKeypair();
+  assert.throws(() => readConfig({ ...env, NOSTR_ATTESTOR_PUBKEY: other.pk, NOSTR_ATTESTOR_SECRET: nsec }),
+    /does not match/);
+  // ncryptsec is an encrypted envelope and cannot be used as a signing key.
+  assert.throws(() => readConfig({ ...env, NOSTR_ATTESTOR_PUBKEY: pk, NOSTR_ATTESTOR_SECRET: 'ncryptsec1qqq' }),
+    /ncryptsec/);
+});
+test('the license kind is configured separately from the offer kind', () => {
+  const env = { DATABASE_URL: 'postgresql://localhost/test', NOSTR_OFFER_KIND: '9998',
+    NOSTR_ATTESTOR_PUBKEY: attestorPubkey, NOSTR_RELAYS: 'ws://localhost:7777' };
+  assert.equal(readConfig(env).licenseKind, null);
+  assert.equal(readConfig({ ...env, NOSTR_LICENSE_KIND: '9999' }).licenseKind, 9999);
+  assert.throws(() => readConfig({ ...env, NOSTR_LICENSE_KIND: '9998' === '9998' ? '10000' : '1' }));
+  assert.throws(() => readConfig({ ...env, NOSTR_LICENSE_KIND: '1' }));
+});
 test('draft reads require the owner; published offers are public', async () => {
   const { service, offers } = setup();
   const { body } = await create(service);
@@ -129,7 +256,8 @@ test('publishing queues the signed event exactly once and does not claim relay s
   assert.equal(result.body.event_id, event().id);
   await publish(service, body.id);
   assert.equal(outbox.length, 1);
-  assert.deepEqual(outbox[0], event());
+  assert.equal(outbox[0].role, 'offer');
+  assert.deepEqual(outbox[0].event, event());
 });
 test('forged events, different owners, changed terms and stale events are rejected', async () => {
   const bad = setup(() => false);

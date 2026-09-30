@@ -5,6 +5,11 @@ export class PostgresOfferStore {
   async getOffer(id) {
     return (await this.pool.query('SELECT document FROM offers WHERE id = $1', [id])).rows[0]?.document;
   }
+  async getOfferEvent(id) {
+    return (await this.pool.query(
+      "SELECT event FROM nostr_outbox WHERE offer_id = $1 AND event_role = 'offer'", [id])).rows[0]?.event;
+  }
+  // Whole-document upsert, for paths that cannot race the publication worker.
   async saveOfferDocument(document) {
     const id = document.offerId || document.id;
     if (!id) throw new Error('Offer document must include offerId or id');
@@ -13,6 +18,31 @@ export class PostgresOfferStore {
       [id, document]
     );
     return document;
+  }
+  // Settlement and invoice writes touch only {payment}, so a concurrent
+  // publication worker updating {status} is never clobbered.
+  async savePaymentState(id, payment) {
+    await this.pool.query(
+      'UPDATE offers SET document = jsonb_set(document, \'{payment}\', $2::jsonb) WHERE id = $1',
+      [id, JSON.stringify(payment)]
+    );
+  }
+  async getLicense(offerId) {
+    return (await this.pool.query('SELECT * FROM licenses WHERE offer_id = $1', [offerId])).rows[0] || null;
+  }
+  async createLicense({ id, offerId, paymentId, startsAt, endsAt }) {
+    await this.pool.query(
+      `INSERT INTO licenses(id, offer_id, payment_id, starts_at, ends_at, publication_status)
+       VALUES ($1, $2, $3, $4, $5, 'pending') ON CONFLICT (offer_id) DO NOTHING`,
+      [id, offerId, paymentId, startsAt, endsAt]
+    );
+  }
+  async queueLicenseEvent({ eventId, offerId, licenseId, event }) {
+    await this.pool.query(
+      `INSERT INTO nostr_outbox(event_id, offer_id, event_role, license_id, event)
+       VALUES ($1, $2, 'license', $3, $4) ON CONFLICT (event_id) DO NOTHING`,
+      [eventId, offerId, licenseId, event]
+    );
   }
   async saveLightningWebhook(entry) {
     await this.pool.query(
@@ -68,8 +98,21 @@ export class PostgresOfferStore {
       }
       await client.query(`UPDATE nostr_outbox SET published_at = now(), acknowledged_relay = $2,
         attempts = attempts + 1, last_error = NULL WHERE event_id = $1`, [item.event_id, relay]);
-      await client.query(`UPDATE offers SET document = jsonb_set(document, '{status}', '"published"'::jsonb)
-        WHERE id = $1 AND document->>'status' = 'publishing'`, [item.offer_id]);
+      if (item.event_role === 'license') {
+        await client.query(
+          "UPDATE licenses SET publication_status = 'published', event_id = $2 WHERE id = $1",
+          [item.license_id, item.event_id]);
+        // The offer only becomes licensed once the relay accepted the event, and
+        // only while settlement is still recorded as settled.
+        await client.query(
+          `UPDATE offers SET document = jsonb_set(document, '{status}', '"licensed"'::jsonb)
+           WHERE id = $1 AND document->>'status' = 'published'
+             AND document->'payment'->>'status' = 'settled'`, [item.offer_id]);
+      } else {
+        await client.query(
+          `UPDATE offers SET document = jsonb_set(document, '{status}', '"published"'::jsonb)
+           WHERE id = $1 AND document->>'status' = 'publishing'`, [item.offer_id]);
+      }
       await client.query('COMMIT');
       return true;
     } catch (error) { await client.query('ROLLBACK'); throw error; }

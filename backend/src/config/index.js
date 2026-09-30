@@ -1,4 +1,4 @@
-import { nip19 } from 'nostr-tools';
+import { nip19, getPublicKey } from 'nostr-tools';
 
 function readAttestorPubkey(value) {
   const input = String(value || '').trim();
@@ -16,6 +16,51 @@ function readLndUrl(value) {
     throw new Error('LND_REST_URL must be an HTTPS localhost origin from Polar.');
   }
   return url.origin;
+}
+
+// Offer and license kinds are separate regular-event kinds and must both be
+// chosen explicitly. Returning null disables license issuance rather than
+// silently reusing the offer kind, which would collide on the relay.
+function readLicenseKind(value) {
+  if (!value) return null;
+  const licenseKind = Number(value);
+  if (!Number.isInteger(licenseKind) || licenseKind < 1000 || licenseKind >= 10000) {
+    throw new Error('NOSTR_LICENSE_KIND must be a regular event kind (1000..9999)');
+  }
+  return licenseKind;
+}
+
+// Converts the attestor nsec into the raw 32-byte hex that finalizeEvent needs,
+// so signing never has to know which bech32 form the operator supplied.
+//
+// Only nsec is accepted. ncryptsec is a NIP-49 *encrypted* envelope and needs a
+// passphrase to open; nostr-tools cannot decrypt it, so treating one as a key
+// would silently fail. Extract the nsec from your wallet instead.
+function readAttestorSecret(value, attestorPubkey) {
+  const input = String(value || '').trim();
+  if (!input) return null;
+  // Accept a raw 32-byte hex key directly, which is what the signer consumes.
+  if (/^[0-9a-f]{64}$/.test(input)) {
+    assertKeyMatches(input, attestorPubkey);
+    return input;
+  }
+  let decoded;
+  try { decoded = nip19.decode(input); } catch { /* Not bech32; fall through to the error below. */ }
+  // nip19 returns raw *bytes* for an nsec, not a hex string.
+  if (!decoded || decoded.type !== 'nsec' || !(decoded.data instanceof Uint8Array) || decoded.data.length !== 32) {
+    throw new Error('NOSTR_ATTESTOR_SECRET must be a 32-byte hex key or an nsec. ncryptsec is encrypted and cannot be used here; export the nsec from your wallet.');
+  }
+  const secretKey = Buffer.from(decoded.data).toString('hex');
+  assertKeyMatches(secretKey, attestorPubkey);
+  return secretKey;
+}
+
+// getPublicKey needs the raw bytes; passing the hex string throws.
+function assertKeyMatches(secretKey, attestorPubkey) {
+  const derived = getPublicKey(Buffer.from(secretKey, 'hex'));
+  if (derived !== attestorPubkey) {
+    throw new Error('NOSTR_ATTESTOR_SECRET does not match NOSTR_ATTESTOR_PUBKEY. Licenses would be signed by a different identity than offers reference.');
+  }
 }
 
 export function readConfig(env = process.env) {
@@ -36,5 +81,8 @@ export function readConfig(env = process.env) {
   }
   const corsOrigin = env.CORS_ORIGIN ? new URL(env.CORS_ORIGIN).origin : null;
   return { host: env.HOST || '127.0.0.1', port, origin: origin.origin, corsOrigin, databaseUrl: env.DATABASE_URL,
-    kind, attestorPubkey, relays, lndRestUrl: readLndUrl(env.LND_REST_URL), lndMacaroon: env.LND_MACAROON?.trim() || null };
+    kind, attestorPubkey, relays, lndRestUrl: readLndUrl(env.LND_REST_URL), lndMacaroon: env.LND_MACAROON?.trim() || null,
+    speedWebhookSecret: env.SPEED_WEBHOOK_SECRET?.trim() || null,
+    attestorSecretKey: readAttestorSecret(env.NOSTR_ATTESTOR_SECRET, attestorPubkey),
+    licenseKind: readLicenseKind(env.NOSTR_LICENSE_KIND) };
 }

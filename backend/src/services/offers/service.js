@@ -1,13 +1,52 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { validate } from '../../validators/validation.js';
-import { buildOfferEvent } from '../nostr/events.js';
+import { buildOfferEvent, buildLicenseEvent } from '../nostr/events.js';
 import { HttpError } from '../../utils/errors.js';
 import { verifySpeedWebhook } from '../payments/speed.js';
 
-export function createOfferService({ store, verifyEvent, kind, attestorPubkey, speedWebhookSecret, paymentProvider = null, now = () => Math.floor(Date.now() / 1000) }) {
+export function createOfferService({
+  store, verifyEvent, kind, attestorPubkey, licenseKind = null, attestorSecretKey = null,
+  speedWebhookSecret = null, paymentProvider = null, signEvent = null,
+  now = () => Math.floor(Date.now() / 1000)
+}) {
   const input = (schema, body) => {
     try { validate(schema, body); } catch (error) { throw new HttpError(400, 'VALIDATION_ERROR', error.message); }
+  };
+  // A license needs a configured kind, the attestor key, and a signer. Without
+  // all three the offer stays settled but unlicensed rather than publishing a
+  // signature we cannot produce.
+  const canIssueLicense = Boolean(licenseKind && attestorSecretKey && signEvent);
+  const issueLicense = async offer => {
+    if (!canIssueLicense) return null;
+    // Checked before building or signing: the status endpoint is polled
+    // repeatedly, and re-signing each time would queue a duplicate license.
+    const existing = await store.getLicense(offer.id);
+    if (existing) return existing;
+    const offerEvent = await store.getOfferEvent(offer.id);
+    if (!offerEvent) return null;
+    const settlement = {
+      offer_event_id: offerEvent.id,
+      payment_hash: offer.payment.payment_hash,
+      amount_sats: offer.payment.amount_sats,
+      settled_at: offer.payment.settled_at
+    };
+    let template;
+    try {
+      // buildLicenseEvent re-checks amount, attestor and timestamp against the
+      // offer that is actually on the relay, so a settlement that does not match
+      // the published terms is refused here rather than attested.
+      template = buildLicenseEvent({ kind: licenseKind, attestorPubkey, offerEvent, settlement });
+    } catch (error) {
+      throw new HttpError(500, 'LICENSE_BUILD_FAILED', `Settlement did not match the published offer: ${error.message}`);
+    }
+    const event = await signEvent(template, attestorSecretKey);
+    const license = { id: randomUUID(), offerId: offer.id, paymentId: randomUUID(),
+      startsAt: settlement.settled_at, endsAt: JSON.parse(template.content).ends_at };
+    await store.createLicense({ id: license.id, offerId: offer.id, paymentId: license.paymentId,
+      startsAt: license.startsAt, endsAt: license.endsAt });
+    await store.queueLicenseEvent({ eventId: event.id, offerId: offer.id, licenseId: license.id, event });
+    return license;
   };
   const normalizeWebhook = body => {
     const payload = body && typeof body === 'object' ? body : {};
@@ -90,12 +129,11 @@ export function createOfferService({ store, verifyEvent, kind, attestorPubkey, s
           Number(invoice.amount_sat) !== offer.terms.amount_sats || invoice.status !== 'pending') {
         throw new HttpError(502, 'PAYMENT_PROVIDER_ERROR', 'Polar LND returned an invalid Lightning invoice.');
       }
-      const next = { ...offer, payment: {
-        provider: paymentProvider.name || 'polar-lnd', invoice_id: invoice.id, payment_hash: String(invoice.payment_hash),
-        request: invoice.request, amount_sats: offer.terms.amount_sats, status: 'pending',
-        reference: `contentport_${offer.id}`, expires_at: invoice.expires_at
-      } };
-      await store.saveOfferDocument(next);
+      const next = { provider: paymentProvider.name || 'polar-lnd', invoice_id: invoice.id,
+        payment_hash: String(invoice.payment_hash), request: invoice.request,
+        amount_sats: offer.terms.amount_sats, status: 'pending',
+        reference: `contentport_${offer.id}`, expires_at: invoice.expires_at };
+      await store.savePaymentState(id, next);
       return { status: 201, body: { offerId: offer.id, amountSats: offer.terms.amount_sats, paymentRequest: invoice.request } };
     },
     async getStatus(id) {
@@ -105,19 +143,31 @@ export function createOfferService({ store, verifyEvent, kind, attestorPubkey, s
         try {
           const invoice = await paymentProvider.lookupInvoice(offer.payment.payment_hash);
           if (invoice.status === 'settled') {
-            offer = { ...offer, payment: { ...offer.payment, status: 'settled', settled_at: invoice.settled_at ?? now() } };
-            await store.saveOfferDocument(offer);
+            const settledAt = invoice.settled_at ?? now();
+            // Targeted merge of {payment} only. The publication worker writes
+            // {status} with a jsonb_set on the same row, and a whole-document
+            // save here would roll the offer back to "publishing" if it landed
+            // in between.
+            await store.savePaymentState(id, { ...offer.payment, status: 'settled', settled_at: settledAt });
+            offer = { ...offer, payment: { ...offer.payment, status: 'settled', settled_at: settledAt } };
           }
         } catch (error) {
           if (!(error instanceof HttpError) || error.status !== 503) throw error;
         }
       }
+      // A settled offer that is not yet licensed still needs its license event
+      // built, signed and queued. Running on every poll means a transient signer
+      // or database failure retries without extra machinery.
+      if (offer.payment?.status === 'settled' && offer.status !== 'licensed') {
+        await issueLicense(offer);
+      }
+      const license = offer.status === 'licensed' ? await store.getLicense(offer.id) : null;
       return { status: 200, body: {
         offerId: offer.id,
         status: offer.status === 'licensed' ? 'LICENSED' : offer.payment?.status === 'settled' ? 'PAYMENT_SETTLED' : offer.payment?.status === 'pending' ? 'PAYMENT_PENDING' : 'OPEN',
         ...(offer.payment?.settled_at ? { paymentSettledAt: offer.payment.settled_at } : {}),
-        ...(offer.licensed_at ? { licensedAt: offer.licensed_at } : {}),
-        ...(offer.license_event_id ? { licenseNostrEventId: offer.license_event_id } : {})
+        ...(license?.publication_status === 'published'
+          ? { licensedAt: license.starts_at, licenseNostrEventId: license.event_id } : {})
       } };
     },
     async lightningWebhook({ body, headers, rawBody, provider = 'speed' }) {
