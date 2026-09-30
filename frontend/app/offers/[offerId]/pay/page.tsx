@@ -23,7 +23,7 @@ const POLL_INTERVAL_MS = Number(
  *   1. On mount: load the offer (for the summary panel) and request a
  *      Lightning invoice via POST /api/offers/:offerId/payment.
  *   2. Once an invoice exists, poll GET /api/offers/:offerId/status on an
- *      interval until it reports "LICENSED".
+ *      interval until it reports a settled payment.
  *
  * IMPORTANT (spec section 16/17): this page must NEVER show "payment
  * received" on its own — that state is only set from the polled backend
@@ -55,8 +55,9 @@ export default function PaymentPage({
         if (cancelled) return;
         setOffer(offerData);
         setPayment(paymentData);
-      } catch {
-        if (!cancelled) setError("Unable to start payment for this offer.");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to start payment for this offer.";
+        if (!cancelled) setError(message);
       }
     }
 
@@ -73,7 +74,7 @@ export default function PaymentPage({
     pollRef.current = setInterval(async () => {
       try {
         const status = await getOfferStatus(params.offerId);
-        if (status.status === "LICENSED") {
+        if (status.status === "LICENSED" || status.status === "PAYMENT_SETTLED") {
           setConfirmed(true);
           if (pollRef.current) clearInterval(pollRef.current);
         }
@@ -132,7 +133,7 @@ export default function PaymentPage({
 
             <div className="mt-6 rounded-lg bg-white border border-border p-6">
               <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                Amount
+                License price
               </p>
               <div className="mt-2 flex items-center gap-3">
                 <span className="text-2xl text-yellow-500">₿</span>
@@ -140,6 +141,9 @@ export default function PaymentPage({
                   {payment.amountSats.toLocaleString()} sats
                 </p>
               </div>
+              <p className="mt-2 text-sm text-text-secondary">
+                The Creator receives this amount when the Lightning invoice is paid.
+              </p>
             </div>
 
             <Card className="mt-6">

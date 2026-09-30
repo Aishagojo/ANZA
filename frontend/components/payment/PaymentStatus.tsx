@@ -25,10 +25,10 @@ export function PaymentStatus({
           <CheckCircle size={16} /> Payment received
         </p>
         <p className="mt-1 text-sm text-text-secondary">
-          License recorded successfully.
+          The Creator's Lightning invoice has settled.
         </p>
         <Link href={`/offers/${offerId}`} className="mt-3 block">
-          <Button fullWidth>View License →</Button>
+          <Button fullWidth>View Offer →</Button>
         </Link>
       </div>
     );
