@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Smooth anchor scrolling (e.g. footer/landing "How it works"), disabled for
+   people who prefer reduced motion */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 body {
   background-color: #ffffff;
   color: #0f172a;
@@ -59,4 +67,44 @@ a:hover .footer-arrow-move {
   transform: translateY(-4px);
   box-shadow: 0 20px 25px -5px rgb(15 23 42 / 0.08),
     0 8px 10px -6px rgb(15 23 42 / 0.06);
+}
+
+/* ───────── Landing page cards (used by app/page.tsx) ───────── */
+
+/* Card lifts and gets a soft blue glow on hover */
+.lift-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease,
+    border-color 0.3s ease;
+}
+.lift-card:hover {
+  transform: translateY(-4px);
+  border-color: rgb(191 219 254);
+  box-shadow: 0 20px 25px -5px rgb(37 99 235 / 0.1),
+    0 8px 10px -6px rgb(37 99 235 / 0.08);
+}
+
+/* Hero illustration gently floats up and down */
+@keyframes hero-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+.hero-float {
+  animation: hero-float 6s ease-in-out infinite;
+}
+
+/* No movement for people who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .lift-card,
+  .lift-card:hover {
+    transition: none;
+    transform: none;
+  }
+  .hero-float {
+    animation: none;
+  }
 }

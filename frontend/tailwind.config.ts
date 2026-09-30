@@ -24,7 +24,7 @@ const config: Config = {
         border: "#E2E8F0",
       },
       fontFamily: {
-        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["var(--font-inter)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       maxWidth: {
         page: "1280px",

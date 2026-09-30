@@ -148,7 +148,7 @@ export function Footer() {
     <footer className="relative border-t border-slate-300/60 bg-gradient-to-b from-slate-100 to-slate-200">
       <div className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500/30 to-transparent" />
 
-      <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6">
+      <div className="relative mx-auto max-w-page px-4 py-14 sm:px-6">
         {/* ─── TOP: brand + socials + call to action ─── */}
         <div className="mb-12 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-sm">
