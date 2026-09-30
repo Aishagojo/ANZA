@@ -7,7 +7,6 @@ import {
   ShieldCheck as VerifiedIcon,
 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
-import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/Button";
 
 /**
@@ -17,7 +16,7 @@ import { Button } from "@/components/ui/Button";
  */
 export default function LandingPage() {
   return (
-    <main className="min-h-screen flex flex-col">
+    <main className="flex flex-col">
       <Navbar />
 
       {/* Hero */}
@@ -84,10 +83,6 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
-      <div className="mt-auto">
-        <Footer />
-      </div>
     </main>
   );
 }

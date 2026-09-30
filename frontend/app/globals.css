@@ -12,3 +12,51 @@ body {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
+
+/* ───────── Footer animations (used by components/layout/Footer.tsx) ───────── */
+
+/* Arrow inside the "Create an Offer" button slides right on hover */
+.footer-arrow-move {
+  transition: transform 0.25s ease;
+}
+a:hover .footer-arrow-move {
+  transform: translateX(4px);
+}
+
+/* Animated underline that grows under a link on hover */
+.footer-link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  transition: background-size 0.3s ease;
+}
+.footer-link-underline:hover {
+  background-size: 100% 1px;
+}
+
+/* Small green status dot that gently pulses */
+@keyframes footer-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+}
+.footer-pulse-dot {
+  animation: footer-pulse-dot 2s ease-in-out infinite;
+}
+
+/* Footer cards lift slightly on hover */
+.footer-card-hover {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.footer-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgb(15 23 42 / 0.08),
+    0 8px 10px -6px rgb(15 23 42 / 0.06);
+}
