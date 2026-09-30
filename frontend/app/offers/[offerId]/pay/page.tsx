@@ -1,20 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ShieldCheck } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Card } from "@/components/ui/Card";
 import { ContentPreview } from "@/components/offer/ContentPreview";
 import { LightningQR } from "@/components/payment/LightningQR";
 import { InvoiceDisplay } from "@/components/payment/InvoiceDisplay";
-import { PaymentStatus } from "@/components/payment/PaymentStatus";
 import { createPaymentRequest, getOffer, getOfferStatus } from "@/lib/api";
-import { Offer, PaymentRequestResponse } from "@/lib/types";
+import { Offer, OfferStatusResponse, PaymentRequestResponse } from "@/lib/types";
 import { LICENSE_TYPE_LABELS } from "@/lib/licenseTypes";
+import { PaymentPhase, PaymentStatus } from "@/components/payment/PaymentStatus";
 
 const POLL_INTERVAL_MS = Number(
   process.env.NEXT_PUBLIC_STATUS_POLL_INTERVAL_MS ?? 3000,
 );
+
+/**
+ * Maps a polled backend status onto a buyer-facing phase.
+ *
+ * Payment settled and license recorded are different facts. `PAYMENT_SETTLED`
+ * with issuance "unavailable" means the money arrived but no license will ever
+ * exist, which must not be presented as a completed purchase.
+ */
+function phaseFor(status: OfferStatusResponse): PaymentPhase | null {
+  if (status.status === "LICENSED") return "licensed";
+  if (status.status === "PAYMENT_SETTLED") {
+    return status.licenseIssuance === "unavailable" ? "license_unavailable" : "issuing_license";
+  }
+  return null;
+}
 
 /**
  * Screen 4 — Payment Page (spec sections 15, 16, 17).
@@ -23,7 +37,8 @@ const POLL_INTERVAL_MS = Number(
  *   1. On mount: load the offer (for the summary panel) and request a
  *      Lightning invoice via POST /api/offers/:offerId/payment.
  *   2. Once an invoice exists, poll GET /api/offers/:offerId/status on an
- *      interval until it reports a settled payment.
+ *      interval until the license is recorded, or until it is clear no
+ *      license can be issued.
  *
  * IMPORTANT (spec section 16/17): this page must NEVER show "payment
  * received" on its own — that state is only set from the polled backend
@@ -38,7 +53,7 @@ export default function PaymentPage({
 }) {
   const [offer, setOffer] = useState<Offer | null>(null);
   const [payment, setPayment] = useState<PaymentRequestResponse | null>(null);
-  const [confirmed, setConfirmed] = useState(false);
+  const [phase, setPhase] = useState<PaymentPhase>("awaiting_payment");
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -67,15 +82,17 @@ export default function PaymentPage({
     };
   }, [params.offerId]);
 
-  // Step 2: poll for confirmation once we have an active invoice.
+  // Step 2: poll for confirmation once we have an active invoice. Polling
+  // continues through PAYMENT_SETTLED because the license is issued after the
+  // payment settles, and only stops once the outcome is actually known.
   useEffect(() => {
-    if (!payment || confirmed) return;
+    if (!payment || phase === "licensed" || phase === "license_unavailable") return;
 
     pollRef.current = setInterval(async () => {
       try {
-        const status = await getOfferStatus(params.offerId);
-        if (status.status === "LICENSED" || status.status === "PAYMENT_SETTLED") {
-          setConfirmed(true);
+        const next = phaseFor(await getOfferStatus(params.offerId));
+        if (next) {
+          setPhase(next);
           if (pollRef.current) clearInterval(pollRef.current);
         }
       } catch {
@@ -86,7 +103,7 @@ export default function PaymentPage({
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [payment, confirmed, params.offerId]);
+  }, [payment, phase, params.offerId]);
 
   if (error) {
     return (
@@ -220,7 +237,7 @@ export default function PaymentPage({
             </div>
 
             <div className="mt-6">
-              <PaymentStatus confirmed={confirmed} offerId={offer.offerId} />
+              <PaymentStatus phase={phase} offerId={offer.offerId} />
             </div>
           </Card>
         </div>

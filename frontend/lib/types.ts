@@ -12,6 +12,30 @@ export type LicenseType = "30_DAY_SOCIAL" | "90_DAY_COMMERCIAL" | "PERPETUAL";
 
 export type OfferStatus = "OPEN" | "PAYMENT_PENDING" | "PAYMENT_SETTLED" | "LICENSED";
 
+/**
+ * Where the license stands for a paid offer.
+ *
+ * The distinction that matters is between `pending` and `unavailable`:
+ * `pending` means the backend is signing and relaying right now, while
+ * `unavailable` means this deployment has no attestor configured and no
+ * license will ever be produced. Collapsing the two would tell a buyer a
+ * license is on its way when it never will be.
+ */
+export type LicenseIssuance =
+  | "not_started"
+  | "pending"
+  | "published"
+  | "unavailable";
+
+/** The published license record. Only present once a relay has accepted it. */
+export interface OfferLicense {
+  eventId: string;
+  /** Unix seconds. The license term starts here, which is settlement time. */
+  startsAt: number;
+  /** Unix seconds, or null for a perpetual license. */
+  endsAt: number | null;
+}
+
 /** Full offer record — response shape of GET /api/offers/:offerId */
 export interface Offer {
   offerId: string;
@@ -25,10 +49,9 @@ export interface Offer {
   status: OfferStatus;
   nostrEventId: string;
   creatorHandle: string;
-  /** Only present once status === "LICENSED" */
-  licensedAt?: string;
-  /** Nostr event id of the license/payment confirmation event (kind: license_purchase) */
-  licenseNostrEventId?: string;
+  /** Only present once the license event has been accepted by a relay. */
+  license?: OfferLicense;
+  licenseIssuance?: LicenseIssuance;
 }
 
 /** Body of POST /api/offers */
@@ -61,7 +84,7 @@ export interface PaymentRequestResponse {
 export interface OfferStatusResponse {
   offerId: string;
   status: OfferStatus;
-  licenseNostrEventId?: string;
-  licensedAt?: string;
+  licenseIssuance?: LicenseIssuance;
+  license?: OfferLicense;
   paymentSettledAt?: number;
 }

@@ -1,9 +1,10 @@
 import pg from 'pg';
-import { verifyEvent, finalizeEvent } from 'nostr-tools/pure';
+import { verifyEvent } from 'nostr-tools/pure';
 import { readConfig } from './config/index.js';
 import { PostgresOfferStore } from './repositories/offers.js';
 import { createOfferService } from './services/offers/service.js';
 import { createRelayPublisher } from './services/nostr/publisher.js';
+import { createAttestorSigner } from './services/nostr/signer.js';
 import { createLndClient } from './services/payments/lnd-client.js';
 import { createApp } from './app.js';
 
@@ -16,7 +17,7 @@ const paymentProvider = createLndClient({ restUrl: config.lndRestUrl, macaroon: 
 // than letting settled offers sit unlicensed with no explanation.
 if (config.licenseKind && !config.attestorSecretKey) console.warn('NOSTR_LICENSE_KIND is set but NOSTR_ATTESTOR_SECRET is not; settled offers will not be licensed.');
 if (config.attestorSecretKey && !config.licenseKind) console.warn('NOSTR_ATTESTOR_SECRET is set but NOSTR_LICENSE_KIND is not; settled offers will not be licensed.');
-const service = createOfferService({ store, verifyEvent, paymentProvider, signEvent: finalizeEvent, ...config });
+const service = createOfferService({ store, verifyEvent, paymentProvider, signEvent: createAttestorSigner(), ...config });
 const publish = createRelayPublisher({ relays: config.relays });
 const server = createApp({ service, verifyEvent, origin: config.origin, corsOrigin: config.corsOrigin });
 let stopping = false;

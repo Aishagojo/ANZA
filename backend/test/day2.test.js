@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { createHmac } from 'node:crypto';
 import { nip19, generateSecretKey, getPublicKey } from 'nostr-tools';
+import { verifyEvent } from 'nostr-tools/pure';
 import { createOfferService } from '../src/services/offers/service.js';
 import { buildOfferEvent } from '../src/services/nostr/events.js';
 import { createRelayPublisher } from '../src/services/nostr/publisher.js';
+import { createAttestorSigner } from '../src/services/nostr/signer.js';
 import { authenticate, sha256 } from '../src/middleware/auth.js';
 import { HttpError } from '../src/utils/errors.js';
 import { readConfig } from '../src/config/index.js';
@@ -126,8 +128,11 @@ test('status records a Polar LND settlement before reporting it to the frontend'
   offers.set(body.id, { ...body, status: 'published', payment: {
     provider: 'polar-lnd', payment_hash: 'f'.repeat(64), status: 'pending', amount_sats: 500, request: 'lnbc1paymentrequest'
   } });
+  // This deployment has no attestor key or license kind, so the buyer must be
+  // told licensing is unavailable rather than left waiting for a license that
+  // is never going to be produced.
   assert.deepEqual((await service.getStatus(body.id)).body, {
-    offerId: body.id, status: 'PAYMENT_SETTLED', paymentSettledAt: 1200
+    offerId: body.id, status: 'PAYMENT_SETTLED', paymentSettledAt: 1200, licenseIssuance: 'unavailable'
   });
   assert.equal(offers.get(body.id).payment.status, 'settled');
 });
@@ -148,7 +153,12 @@ test('a settled offer queues one signed license event and does not re-sign on la
     provider: 'polar-lnd', payment_hash: 'f'.repeat(64), status: 'pending', amount_sats: 500, request: 'lnbc1paymentrequest'
   } });
 
-  assert.equal((await service.getStatus(body.id)).body.status, 'PAYMENT_SETTLED');
+  // Signing is configured, so the license is queued and the buyer is told it is
+  // still being issued. It is not "published" until the relay accepts it.
+  const firstPoll = (await service.getStatus(body.id)).body;
+  assert.equal(firstPoll.status, 'PAYMENT_SETTLED');
+  assert.equal(firstPoll.licenseIssuance, 'pending');
+  assert.equal(firstPoll.license, undefined);
   assert.equal(signed.length, 1);
   assert.equal(signed[0].secretKey, attestorSecretKey);
   assert.equal(signed[0].template.kind, 9999);
@@ -171,6 +181,34 @@ test('a settled offer queues one signed license event and does not re-sign on la
   await service.getStatus(body.id);
   assert.equal(signed.length, 1);
   assert.equal(outbox.filter(entry => entry.role === 'license').length, 1);
+});
+test('the offer record carries the license once the relay has accepted it', async () => {
+  // The licensed screen reads GET /offers/:id, not /status, so the license has
+  // to travel with the offer or the confirmation page can never show it.
+  const provider = { lookupInvoice: async () => ({ status: 'settled', settled_at: 1200 }) };
+  const signEvent = async template => ({ ...template, id: 'c'.repeat(64), sig: 'f'.repeat(128) });
+  const { service, offers, licenses } = setup(() => true, provider, { licenseKind: 9999, attestorSecretKey: 'b'.repeat(64), signEvent });
+  const { body } = await create(service);
+  await publish(service, body.id);
+  offers.set(body.id, { ...offers.get(body.id), status: 'published', payment: {
+    provider: 'polar-lnd', payment_hash: 'f'.repeat(64), status: 'pending', amount_sats: 500, request: 'lnbc1paymentrequest'
+  } });
+
+  // Settled but not yet relayed: the license must not be advertised.
+  await service.getStatus(body.id);
+  const pending = (await service.get(body.id)).body;
+  assert.equal(pending.license_issuance, 'pending');
+  assert.equal(pending.license, undefined);
+
+  // The publication worker marks it published and flips the offer to licensed.
+  const [license] = [...licenses.values()];
+  licenses.set(license.id, { ...license, publication_status: 'published', event_id: 'c'.repeat(64) });
+  offers.set(body.id, { ...offers.get(body.id), status: 'licensed' });
+
+  const licensed = (await service.get(body.id)).body;
+  assert.equal(licensed.license_issuance, 'published');
+  assert.deepEqual(licensed.license, { eventId: 'c'.repeat(64), startsAt: 1200, endsAt: 1200 + 30 * 86400 });
+  assert.deepEqual((await service.getStatus(body.id)).body.license, licensed.license);
 });
 test('a perpetual license never receives an expiry', async () => {
   const provider = { lookupInvoice: async () => ({ status: 'settled', settled_at: 1200 }) };
@@ -203,6 +241,17 @@ test('a settlement that disagrees with the published offer is refused, not attes
   await assert.rejects(service.getStatus(body.id), { status: 500, code: 'LICENSE_BUILD_FAILED' });
   assert.equal(signed.length, 0);
 });
+test('the attestor signer converts the configured hex key into signing bytes', () => {
+  // finalizeEvent throws "expected Uint8Array" if handed the hex string config
+  // produces, so the real signer is exercised here rather than only a stub.
+  const { sk, pk } = generateKeypair();
+  const template = { kind: 9999, pubkey: pk, created_at: 1000, tags: [['t', 'x']], content: '{}' };
+  const signed = createAttestorSigner()(template, sk);
+  assert.equal(signed.pubkey, pk);
+  assert.equal(verifyEvent(signed), true);
+  // A key that is not 32 hex bytes must fail loudly rather than sign nothing.
+  assert.throws(() => createAttestorSigner()(template, 'abc'), /32-byte lowercase hex/);
+});
 test('a settled offer without an attestor key stays settled and issues no license', async () => {
   const provider = { lookupInvoice: async () => ({ status: 'settled', settled_at: 1200 }) };
   const { service, offers, outbox } = setup(() => true, provider);
@@ -211,6 +260,7 @@ test('a settled offer without an attestor key stays settled and issues no licens
     provider: 'polar-lnd', payment_hash: 'f'.repeat(64), status: 'pending', amount_sats: 500, request: 'lnbc1paymentrequest'
   } });
   assert.equal((await service.getStatus(body.id)).body.status, 'PAYMENT_SETTLED');
+  assert.equal((await service.getStatus(body.id)).body.licenseIssuance, 'unavailable');
   assert.equal(outbox.filter(entry => entry.role === 'license').length, 0);
 });
 test('the attestor secret is accepted as an nsec and must match the attestor pubkey', () => {

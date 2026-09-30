@@ -48,6 +48,29 @@ export function createOfferService({
     await store.queueLicenseEvent({ eventId: event.id, offerId: offer.id, licenseId: license.id, event });
     return license;
   };
+  // Only ever returned once the relay has accepted the event, so a client is
+  // never handed a record it would then present as a Nostr proof.
+  const licenseSummary = license => ({
+    eventId: license.event_id,
+    startsAt: Number(license.starts_at),
+    endsAt: license.ends_at === null || license.ends_at === undefined ? null : Number(license.ends_at)
+  });
+  // Separates "the license is being issued" from "this deployment cannot issue
+  // one at all". Without that distinction a buyer is shown a license that is on
+  // its way when no license will ever exist.
+  const issuanceFor = (offer, license) => {
+    if (license?.publication_status === 'published') return 'published';
+    if (offer.payment?.status !== 'settled') return 'not_started';
+    return canIssueLicense ? 'pending' : 'unavailable';
+  };
+  // The offer document is the whole public record, so the license travels with
+  // it. The licensed screen reads GET /offers/:id and has no other source.
+  const describe = async offer => {
+    if (offer.payment?.status !== 'settled' && offer.status !== 'licensed') return offer;
+    const license = await store.getLicense(offer.id);
+    const license_issuance = issuanceFor(offer, license);
+    return { ...offer, license_issuance, ...(license_issuance === 'published' ? { license: licenseSummary(license) } : {}) };
+  };
   const normalizeWebhook = body => {
     const payload = body && typeof body === 'object' ? body : {};
     const payment = payload.data?.object && typeof payload.data.object === 'object' ? payload.data.object : payload;
@@ -82,9 +105,9 @@ export function createOfferService({
     async get(id, pubkey) {
       const stored = await store.getOffer(id);
       if (!stored) throw new HttpError(404, 'NOT_FOUND', 'Offer not found.');
-      if (stored.offerId) return { status: 200, body: stored };
+      if (stored.offerId) return { status: 200, body: await describe(stored) };
       if (!['published', 'licensed'].includes(stored.status) && stored.creator_pubkey !== pubkey) throw new HttpError(404, 'NOT_FOUND', 'Offer not found.');
-      return { status: 200, body: stored };
+      return { status: 200, body: await describe(stored) };
     },
     async publish({ id, pubkey, body, key, digest }) {
       input('SignedEvent', body);
@@ -161,13 +184,15 @@ export function createOfferService({
       if (offer.payment?.status === 'settled' && offer.status !== 'licensed') {
         await issueLicense(offer);
       }
-      const license = offer.status === 'licensed' ? await store.getLicense(offer.id) : null;
+      const license = offer.status === 'licensed' || offer.payment?.status === 'settled' ? await store.getLicense(offer.id) : null;
+      const licenseIssuance = issuanceFor(offer, license);
       return { status: 200, body: {
         offerId: offer.id,
         status: offer.status === 'licensed' ? 'LICENSED' : offer.payment?.status === 'settled' ? 'PAYMENT_SETTLED' : offer.payment?.status === 'pending' ? 'PAYMENT_PENDING' : 'OPEN',
         ...(offer.payment?.settled_at ? { paymentSettledAt: offer.payment.settled_at } : {}),
-        ...(license?.publication_status === 'published'
-          ? { licensedAt: license.starts_at, licenseNostrEventId: license.event_id } : {})
+        ...(offer.payment?.status === 'settled' || offer.status === 'licensed'
+          ? { licenseIssuance, ...(licenseIssuance === 'published' ? { license: licenseSummary(license) } : {}) }
+          : {})
       } };
     },
     async lightningWebhook({ body, headers, rawBody, provider = 'speed' }) {
