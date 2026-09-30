@@ -14,7 +14,7 @@ type BackendOffer = {
   };
   status: "draft" | "publishing" | "published" | "licensed";
   event_id: string | null;
-  payment?: { status?: "pending" | "settled" };
+  payment?: { status?: "pending" | "settled"; settled_at?: number };
 };
 
 function idempotencyKey() { return crypto.randomUUID().replaceAll("-", ""); }
@@ -54,6 +54,7 @@ function fromBackend(offer: BackendOffer): Offer {
     licenseType: type, licenseDescription: offer.terms.usage_rights,
     status: offer.status === "licensed" ? "LICENSED" : offer.payment?.status === "settled" ? "PAYMENT_SETTLED" : offer.payment?.status === "pending" ? "PAYMENT_PENDING" : "OPEN",
     nostrEventId: offer.event_id ?? "Pending relay acknowledgement",
+    ...(offer.payment?.settled_at ? { paymentSettledAt: offer.payment.settled_at } : {}),
     creatorHandle: `${offer.creator_pubkey.slice(0, 8)}…${offer.creator_pubkey.slice(-6)}` };
 }
 async function waitForPublication(offerId: string): Promise<BackendOffer> {

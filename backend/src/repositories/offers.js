@@ -5,6 +5,9 @@ export class PostgresOfferStore {
   async getOffer(id) {
     return (await this.pool.query('SELECT document FROM offers WHERE id = $1', [id])).rows[0]?.document;
   }
+  async getOfferEvent(id, eventId) {
+    return (await this.pool.query('SELECT event FROM nostr_outbox WHERE offer_id = $1 AND event_id = $2', [id, eventId])).rows[0]?.event;
+  }
   async saveOfferDocument(document) {
     const id = document.offerId || document.id;
     if (!id) throw new Error('Offer document must include offerId or id');
@@ -13,6 +16,24 @@ export class PostgresOfferStore {
       [id, document]
     );
     return document;
+  }
+  async queueLicense(offer, event) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`license:${offer.id}`]);
+      const current = (await client.query('SELECT document FROM offers WHERE id = $1 FOR UPDATE', [offer.id])).rows[0]?.document;
+      if (!current) throw new HttpError(404, 'NOT_FOUND', 'Offer not found.');
+      if (current.license_event_id) { await client.query('COMMIT'); return current; }
+      const next = { ...current, status: 'licensing', license_event_id: event.id, licensed_at: offer.payment.settled_at };
+      await client.query('INSERT INTO nostr_outbox(event_id, offer_id, event) VALUES ($1, $2, $3)', [event.id, offer.id, event]);
+      await client.query('UPDATE offers SET document = $2 WHERE id = $1', [offer.id, next]);
+      await client.query('COMMIT');
+      return next;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally { client.release(); }
   }
   async saveLightningWebhook(entry) {
     await this.pool.query(
@@ -68,8 +89,10 @@ export class PostgresOfferStore {
       }
       await client.query(`UPDATE nostr_outbox SET published_at = now(), acknowledged_relay = $2,
         attempts = attempts + 1, last_error = NULL WHERE event_id = $1`, [item.event_id, relay]);
-      await client.query(`UPDATE offers SET document = jsonb_set(document, '{status}', '"published"'::jsonb)
-        WHERE id = $1 AND document->>'status' = 'publishing'`, [item.offer_id]);
+      await client.query(`UPDATE offers SET document = CASE
+        WHEN document->>'status' = 'publishing' THEN jsonb_set(document, '{status}', '"published"'::jsonb)
+        WHEN document->>'status' = 'licensing' THEN jsonb_set(document, '{status}', '"licensed"'::jsonb)
+        ELSE document END WHERE id = $1`, [item.offer_id]);
       await client.query('COMMIT');
       return true;
     } catch (error) { await client.query('ROLLBACK'); throw error; }

@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { validate } from '../../validators/validation.js';
-import { buildOfferEvent } from '../nostr/events.js';
+import { finalizeEvent } from 'nostr-tools/pure';
+import { buildOfferEvent, buildLicenseEvent } from '../nostr/events.js';
 import { HttpError } from '../../utils/errors.js';
 import { verifySpeedWebhook } from '../payments/speed.js';
 
-export function createOfferService({ store, verifyEvent, kind, attestorPubkey, speedWebhookSecret, paymentProvider = null, now = () => Math.floor(Date.now() / 1000) }) {
+export function createOfferService({ store, verifyEvent, kind, attestorPubkey, attestorSecretKey = null, speedWebhookSecret, paymentProvider = null, now = () => Math.floor(Date.now() / 1000) }) {
   const input = (schema, body) => {
     try { validate(schema, body); } catch (error) { throw new HttpError(400, 'VALIDATION_ERROR', error.message); }
   };
@@ -27,6 +28,18 @@ export function createOfferService({ store, verifyEvent, kind, attestorPubkey, s
       : Math.floor(Date.parse(payment.expires_at) / 1000);
     return Number.isFinite(expiry) && expiry <= now();
   };
+  const queueLicenseAttestation = async offer => {
+    if (!attestorSecretKey || offer.license_event_id || !offer.payment?.settled_at) return offer;
+    const offerEvent = await store.getOfferEvent(offer.id, offer.event_id);
+    if (!offerEvent) throw new HttpError(503, 'LICENSE_EVENT_UNAVAILABLE', 'The original Nostr offer event is unavailable for license attestation.');
+    const template = buildLicenseEvent({ kind, attestorPubkey, offerEvent, settlement: {
+      offer_event_id: offer.event_id, payment_hash: offer.payment.payment_hash,
+      amount_sats: offer.payment.amount_sats, settled_at: offer.payment.settled_at
+    } });
+    const signed = finalizeEvent(template, attestorSecretKey);
+    if (signed.pubkey !== attestorPubkey) throw new HttpError(500, 'ATTESTOR_KEY_MISMATCH', 'The configured attestor key cannot sign this license event.');
+    return store.queueLicense({ ...offer, status: 'licensing', license_event_id: signed.id }, signed);
+  };
   return {
     async create({ pubkey, body, key, digest }) {
       input('Terms', body);
@@ -44,7 +57,7 @@ export function createOfferService({ store, verifyEvent, kind, attestorPubkey, s
       const stored = await store.getOffer(id);
       if (!stored) throw new HttpError(404, 'NOT_FOUND', 'Offer not found.');
       if (stored.offerId) return { status: 200, body: stored };
-      if (!['published', 'licensed'].includes(stored.status) && stored.creator_pubkey !== pubkey) throw new HttpError(404, 'NOT_FOUND', 'Offer not found.');
+      if (!['published', 'licensing', 'licensed'].includes(stored.status) && stored.creator_pubkey !== pubkey) throw new HttpError(404, 'NOT_FOUND', 'Offer not found.');
       return { status: 200, body: stored };
     },
     async publish({ id, pubkey, body, key, digest }) {
@@ -75,7 +88,7 @@ export function createOfferService({ store, verifyEvent, kind, attestorPubkey, s
     async createPayment(id) {
       if (!paymentProvider) throw new HttpError(501, 'PAYMENT_NOT_CONFIGURED', "Polar LND is not configured. Add the Creator node's LND_REST_URL and LND_MACAROON to backend/.env.");
       const offer = await store.getOffer(id);
-      if (!offer || !['published', 'licensed'].includes(offer.status)) throw new HttpError(404, 'NOT_FOUND', 'Offer not found.');
+      if (!offer || !['published', 'licensing', 'licensed'].includes(offer.status)) throw new HttpError(404, 'NOT_FOUND', 'Offer not found.');
       if (offer.status === 'licensed') throw new HttpError(409, 'OFFER_ALREADY_LICENSED', 'This offer has already been licensed.');
       if (offer.payment?.status === 'settled' || (offer.payment?.status === 'pending' && !invoiceHasExpired(offer.payment))) {
         return { status: 200, body: { offerId: offer.id, amountSats: offer.payment.amount_sats, paymentRequest: offer.payment.request } };
@@ -100,17 +113,21 @@ export function createOfferService({ store, verifyEvent, kind, attestorPubkey, s
     },
     async getStatus(id) {
       let offer = await store.getOffer(id);
-      if (!offer || !['published', 'licensed'].includes(offer.status)) throw new HttpError(404, 'NOT_FOUND', 'Offer not found.');
+      if (!offer || !['published', 'licensing', 'licensed'].includes(offer.status)) throw new HttpError(404, 'NOT_FOUND', 'Offer not found.');
       if (offer.payment?.status === 'pending' && paymentProvider?.lookupInvoice) {
         try {
           const invoice = await paymentProvider.lookupInvoice(offer.payment.payment_hash);
           if (invoice.status === 'settled') {
             offer = { ...offer, payment: { ...offer.payment, status: 'settled', settled_at: invoice.settled_at ?? now() } };
             await store.saveOfferDocument(offer);
+            offer = await queueLicenseAttestation(offer);
           }
         } catch (error) {
           if (!(error instanceof HttpError) || error.status !== 503) throw error;
         }
+      }
+      if (offer.payment?.status === 'settled' && !offer.license_event_id) {
+        offer = await queueLicenseAttestation(offer);
       }
       return { status: 200, body: {
         offerId: offer.id,
