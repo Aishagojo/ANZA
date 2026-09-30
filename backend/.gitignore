@@ -1,0 +1,32 @@
+node_modules/
+
+# Local environment configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Private key and wallet files
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.secret
+secrets/
+wallets/
+
+# Local data, database exports, and uploaded media
+data/
+storage/
+uploads/
+*.sql
+*.dump
+*.backup
+
+# Test output, logs, and runtime files
+coverage/
+logs/
+*.log
+*.pid
+.cache/
+.tmp/

@@ -15,6 +15,11 @@ const CONFIG: Record<
     classes: "bg-blue-50 text-brand",
     icon: <Clock size={14} />,
   },
+  PAYMENT_SETTLED: {
+    label: "Payment received",
+    classes: "bg-success-bg text-success",
+    icon: <CheckCircle size={14} />,
+  },
   LICENSED: {
     label: "Licensed",
     classes: "bg-success-bg text-success",

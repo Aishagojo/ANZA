@@ -10,7 +10,7 @@
 
 export type LicenseType = "30_DAY_SOCIAL" | "90_DAY_COMMERCIAL" | "PERPETUAL";
 
-export type OfferStatus = "OPEN" | "PAYMENT_PENDING" | "LICENSED";
+export type OfferStatus = "OPEN" | "PAYMENT_PENDING" | "PAYMENT_SETTLED" | "LICENSED";
 
 /** Full offer record — response shape of GET /api/offers/:offerId */
 export interface Offer {
@@ -63,4 +63,5 @@ export interface OfferStatusResponse {
   status: OfferStatus;
   licenseNostrEventId?: string;
   licensedAt?: string;
+  paymentSettledAt?: number;
 }

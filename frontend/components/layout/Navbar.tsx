@@ -65,24 +65,6 @@ export function Navbar({
                 >
                   Create Offer
                 </Link>
-                <Link
-                  href="/offers/sample-offer"
-                  className="text-sm text-text-secondary hover:text-text-primary"
-                >
-                  Public Offer
-                </Link>
-                <Link
-                  href="/offers/sample-offer/pay"
-                  className="text-sm text-text-secondary hover:text-text-primary"
-                >
-                  Payment
-                </Link>
-                <Link
-                  href="/licensed-confirmation"
-                  className="text-sm text-text-secondary hover:text-text-primary"
-                >
-                  Licensed Confirmation
-                </Link>
               </nav>
 
               <Link href="/create">

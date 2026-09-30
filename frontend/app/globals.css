@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Smooth anchor scrolling (e.g. footer/landing "How it works"), disabled for
+   people who prefer reduced motion */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 body {
   background-color: #ffffff;
   color: #0f172a;
@@ -11,4 +19,92 @@ body {
 :focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
+}
+
+/* ───────── Footer animations (used by components/layout/Footer.tsx) ───────── */
+
+/* Arrow inside the "Create an Offer" button slides right on hover */
+.footer-arrow-move {
+  transition: transform 0.25s ease;
+}
+a:hover .footer-arrow-move {
+  transform: translateX(4px);
+}
+
+/* Animated underline that grows under a link on hover */
+.footer-link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  transition: background-size 0.3s ease;
+}
+.footer-link-underline:hover {
+  background-size: 100% 1px;
+}
+
+/* Small green status dot that gently pulses */
+@keyframes footer-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+}
+.footer-pulse-dot {
+  animation: footer-pulse-dot 2s ease-in-out infinite;
+}
+
+/* Footer cards lift slightly on hover */
+.footer-card-hover {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.footer-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgb(15 23 42 / 0.08),
+    0 8px 10px -6px rgb(15 23 42 / 0.06);
+}
+
+/* ───────── Landing page cards (used by app/page.tsx) ───────── */
+
+/* Card lifts and gets a soft blue glow on hover */
+.lift-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease,
+    border-color 0.3s ease;
+}
+.lift-card:hover {
+  transform: translateY(-4px);
+  border-color: rgb(191 219 254);
+  box-shadow: 0 20px 25px -5px rgb(37 99 235 / 0.1),
+    0 8px 10px -6px rgb(37 99 235 / 0.08);
+}
+
+/* Hero illustration gently floats up and down */
+@keyframes hero-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+.hero-float {
+  animation: hero-float 6s ease-in-out infinite;
+}
+
+/* No movement for people who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .lift-card,
+  .lift-card:hover {
+    transition: none;
+    transform: none;
+  }
+  .hero-float {
+    animation: none;
+  }
 }
