@@ -1,3 +1,9 @@
+/*
+  Payment page (dynamic)
+  Handles creating a Lightning invoice and polling for payment status.
+  This page must not assume payment success — it only reflects backend
+  state returned from the `getOfferStatus` endpoint.
+*/
 "use client";
 
 import { useEffect, useRef, useState } from "react";
