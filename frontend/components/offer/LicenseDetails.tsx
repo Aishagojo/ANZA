@@ -7,10 +7,10 @@ import { LICENSE_TYPE_LABELS } from "@/lib/licenseTypes";
  * and the licensed confirmation page (spec section 18) — those two screens
  * show almost the same fields, so this is shared rather than duplicated.
  */
-export function LicenseDetails({ offer }: { offer: Offer }) {
+export function LicenseDetails({ offer, brandLabel = "Licensed To" }: { offer: Offer; brandLabel?: string }) {
   return (
     <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-      <Field icon={<User size={14} />} label="Licensed To" value={offer.brandName} />
+      <Field icon={<User size={14} />} label={brandLabel} value={offer.brandName} />
       <Field
         icon={<Calendar size={14} />}
         label="License"

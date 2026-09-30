@@ -29,6 +29,8 @@ export interface Offer {
   licensedAt?: string;
   /** Nostr event id of the license/payment confirmation event (kind: license_purchase) */
   licenseNostrEventId?: string;
+  /** Unix timestamp from LND once the Lightning invoice settles. */
+  paymentSettledAt?: number;
 }
 
 /** Body of POST /api/offers */

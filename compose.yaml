@@ -13,7 +13,7 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/src/database/migrations/001_offers.sql:/docker-entrypoint-initdb.d/001_offers.sql:ro
+      - ./backend/src/database/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U contentport -d contentport"]
       interval: 5s

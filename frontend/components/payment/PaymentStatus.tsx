@@ -28,7 +28,7 @@ export function PaymentStatus({
           The Creator's Lightning invoice has settled.
         </p>
         <Link href={`/offers/${offerId}`} className="mt-3 block">
-          <Button fullWidth>View Offer →</Button>
+          <Button fullWidth>View payment receipt →</Button>
         </Link>
       </div>
     );

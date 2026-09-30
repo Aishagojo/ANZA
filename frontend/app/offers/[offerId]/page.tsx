@@ -71,11 +71,9 @@ export default function OfferPage({ params }: { params: { offerId: string } }) {
     );
   }
 
-  return offer.status === "LICENSED" ? (
-    <LicensedView offer={offer} />
-  ) : (
-    <PublicOfferView offer={offer} />
-  );
+  if (offer.status === "LICENSED") return <LicensedView offer={offer} />;
+  if (offer.status === "PAYMENT_SETTLED") return <PaymentConfirmedView offer={offer} />;
+  return <PublicOfferView offer={offer} />;
 }
 
 /** Screen 3 — spec section 11/12/13 */
@@ -95,7 +93,7 @@ function PublicOfferView({ offer }: { offer: Offer }) {
         </div>
 
         <Card className="mt-8">
-          <LicenseDetails offer={offer} />
+          <LicenseDetails offer={offer} brandLabel="Offered To" />
 
           <div className="mt-6 flex items-center justify-between border-t border-border pt-6">
             <div>
@@ -127,6 +125,67 @@ function PublicOfferView({ offer }: { offer: Offer }) {
 
         <div className="mt-6">
           <VerificationCard eventId={offer.nostrEventId} />
+        </div>
+      </div>
+    </main>
+  );
+}
+
+/** Payment receipt — shown only after the backend confirms the LND settlement. */
+function PaymentConfirmedView({ offer }: { offer: Offer }) {
+  const settledDate = offer.paymentSettledAt
+    ? new Date(offer.paymentSettledAt * 1000).toLocaleString("en-US", {
+        day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit"
+      })
+    : "Confirmed by Lightning node";
+
+  return (
+    <main>
+      <Navbar backHref="/" verified />
+      <div className="mx-auto max-w-2xl px-6 py-12 text-center">
+        <CheckCircle size={56} className="mx-auto text-success" />
+        <p className="mt-4 text-sm font-semibold uppercase tracking-[0.18em] text-success">
+          Lightning settlement verified
+        </p>
+        <h1 className="mt-2 text-3xl font-bold text-text-primary">Payment Confirmed</h1>
+        <p className="mt-2 text-sm text-text-secondary">
+          {offer.priceSats.toLocaleString()} sats has settled to the Creator node.
+        </p>
+
+        <Card className="mt-8 text-left">
+          <div className="flex items-center gap-4">
+            <ContentPreview url={offer.contentUrl} title={offer.title} size="small" />
+            <div>
+              <p className="font-semibold text-text-primary">{offer.title}</p>
+              <p className="mt-1 text-sm text-text-secondary">License payment receipt</p>
+            </div>
+          </div>
+
+          <div className="mt-6 border-t border-border pt-6">
+            <LicenseDetails offer={offer} />
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-4 border-t border-border pt-6 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Amount settled</p>
+              <p className="mt-1 text-lg font-bold text-text-primary">{offer.priceSats.toLocaleString()} sats</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Settlement time</p>
+              <p className="mt-1 text-sm font-medium text-text-primary">{settledDate}</p>
+            </div>
+          </div>
+        </Card>
+
+        <div className="mt-6 text-left">
+          <VerificationCard eventId={offer.nostrEventId} label="Original offer verified on Nostr" />
+        </div>
+
+        <div className="mt-6 rounded-xl border border-border bg-surface p-5 text-left">
+          <p className="text-sm font-semibold text-text-primary">License record</p>
+          <p className="mt-1 text-sm text-text-secondary">
+            Payment is confirmed. The linked Nostr license attestation will appear here when it is signed and published.
+          </p>
         </div>
       </div>
     </main>

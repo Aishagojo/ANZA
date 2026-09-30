@@ -1,4 +1,6 @@
 import { nip19 } from 'nostr-tools';
+import { getPublicKey } from 'nostr-tools/pure';
+import { decrypt as decryptNcryptsec } from 'nostr-tools/nip49';
 
 function readAttestorPubkey(value) {
   const input = String(value || '').trim();
@@ -8,6 +10,31 @@ function readAttestorPubkey(value) {
     if (decoded.type === 'npub' && /^[0-9a-f]{64}$/.test(decoded.data)) return decoded.data;
   } catch { /* The value is neither an npub nor a raw public key. */ }
   throw new Error('NOSTR_ATTESTOR_PUBKEY must be a raw 64-character hex key or an npub');
+}
+
+function readAttestorSecretKey(env, attestorPubkey) {
+  const encrypted = String(env.NOSTR_ATTESTOR_PRIVATE_KEY || '').trim();
+  if (!encrypted) return null;
+  const password = String(env.NOSTR_ATTESTOR_PASSWORD || '');
+  let secretKey;
+  try {
+    if (encrypted.startsWith('ncryptsec1')) {
+      if (!password) return null;
+      secretKey = decryptNcryptsec(encrypted, password);
+    } else if (encrypted.startsWith('nsec1')) {
+      const decoded = nip19.decode(encrypted);
+      if (decoded.type !== 'nsec') throw new Error('Expected an nsec key');
+      secretKey = decoded.data;
+    } else {
+      throw new Error('Expected an ncryptsec or nsec key');
+    }
+  } catch {
+    throw new Error('Could not unlock NOSTR_ATTESTOR_PRIVATE_KEY. Check the key and NOSTR_ATTESTOR_PASSWORD.');
+  }
+  if (getPublicKey(secretKey) !== attestorPubkey) {
+    throw new Error('Unlocked NOSTR attestor key does not match NOSTR_ATTESTOR_PUBKEY.');
+  }
+  return secretKey;
 }
 
 function readLndUrl(value) {
@@ -25,6 +52,7 @@ export function readConfig(env = process.env) {
   if (!env.DATABASE_URL) throw new Error('DATABASE_URL is required');
   if (!env.NOSTR_OFFER_KIND || !Number.isInteger(kind) || kind < 1000 || kind >= 10000) throw new Error('NOSTR_OFFER_KIND must be an explicitly selected regular kind (1000..9999)');
   const attestorPubkey = readAttestorPubkey(env.NOSTR_ATTESTOR_PUBKEY);
+  const attestorSecretKey = readAttestorSecretKey(env, attestorPubkey);
   const origin = new URL(env.PUBLIC_ORIGIN || `http://localhost:${port}`);
   if (!['http:', 'https:'].includes(origin.protocol) || origin.username || origin.password || origin.href !== `${origin.origin}/`) throw new Error('PUBLIC_ORIGIN must be an HTTP(S) origin without path or credentials');
   const relays = [...new Set((env.NOSTR_RELAYS || '').split(',').map(x => x.trim()).filter(Boolean))];
@@ -36,5 +64,5 @@ export function readConfig(env = process.env) {
   }
   const corsOrigin = env.CORS_ORIGIN ? new URL(env.CORS_ORIGIN).origin : null;
   return { host: env.HOST || '127.0.0.1', port, origin: origin.origin, corsOrigin, databaseUrl: env.DATABASE_URL,
-    kind, attestorPubkey, relays, lndRestUrl: readLndUrl(env.LND_REST_URL), lndMacaroon: env.LND_MACAROON?.trim() || null };
+    kind, attestorPubkey, attestorSecretKey, relays, lndRestUrl: readLndUrl(env.LND_REST_URL), lndMacaroon: env.LND_MACAROON?.trim() || null };
 }
