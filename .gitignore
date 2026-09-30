@@ -1,0 +1,3 @@
+# Repo-root environment for Docker Compose variable substitution only.
+# Local machine settings. Do not commit.
+.env
