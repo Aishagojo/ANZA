@@ -248,6 +248,8 @@ contentport/
 ├── compose.yaml              # Local PostgreSQL service
 └── README.md                 # Project overview
 ```
+DEV VS PRODUCTION NOTES
+strfry.conf + the strfry service in compose.yaml are local development only. Production points NOSTR_RELAYS at third-party wss:// relays.
 
 ## Security and privacy principles
 
