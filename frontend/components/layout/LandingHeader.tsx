@@ -29,23 +29,14 @@ const SIGN_IN_HREF: string | null = null;
 const signInClasses =
   "rounded-lg px-1.5 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:text-slate-900 sm:px-3 sm:text-sm max-[379px]:hidden";
 
-/** Dot + two arcs, drawn to match the approved logo mockup. */
-function BroadcastMark() {
+// Brand refresh: the site name is now ANZA, so the marketing header uses the official logo asset from the public images folder.
+function BrandLogo() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      width={20}
-      height={20}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.2}
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <path d="M5 10.2a10 10 0 0 1 14 0" />
-      <path d="M8.3 13.6a5.3 5.3 0 0 1 7.4 0" />
-      <circle cx="12" cy="17.6" r="1.3" fill="currentColor" stroke="none" />
-    </svg>
+    <img
+      src="/images/Dynamic%20ANZA%20Media%20Logo.png"
+      alt="ANZA"
+      className="h-9 w-auto object-contain"
+    />
   );
 }
 
@@ -61,24 +52,24 @@ export function LandingHeader() {
 
   return (
     <header
-      className={`sticky top-0 z-50 border-b transition-[background-color,border-color,box-shadow] duration-300 ${
+      className={`sticky top-0 z-50 border-b bg-white transition-[background-color,border-color,box-shadow] duration-300 ${
         scrolled
-          ? "border-slate-200/70 bg-white/90 shadow-sm shadow-slate-300/30 backdrop-blur-xl"
-          : "border-transparent bg-transparent"
+          ? "border-slate-200/70 shadow-sm shadow-slate-300/30"
+          : "border-transparent"
       }`}
     >
       <div className="mx-auto flex max-w-page items-center justify-between gap-2 px-4 py-3.5 sm:px-6 sm:py-4">
         {/* Logo */}
         <Link
           href="/"
-          aria-label="ContentPort — home"
+          aria-label="ANZA — home"
           className="group inline-flex shrink-0 items-center gap-2 rounded-lg sm:gap-2.5"
         >
-          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-t border-white/30 bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-600/30 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:shadow-blue-600/50">
-            <BroadcastMark />
+          <span className="relative flex h-10 shrink-0 items-center justify-center rounded-xl transition-all duration-200 group-hover:-translate-y-0.5">
+            <BrandLogo />
           </span>
           <span className="text-base font-bold tracking-tight text-slate-900 transition-colors group-hover:text-blue-700 sm:text-xl">
-            ContentPort
+            ANZA
           </span>
         </Link>
 
