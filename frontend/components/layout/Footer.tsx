@@ -28,11 +28,9 @@ const columns: FooterColumn[] = [
   {
     title: "Product",
     items: [
-      { label: "Home", type: "link", href: "/" },
-      { label: "Create an Offer", type: "link", href: "/create" },
-      { label: "How it works", type: "link", href: "/#how-it-works" },
-      { label: "My Offers", type: "soon" },
-      { label: "License Mgmt", type: "soon" },
+      { label: "Sign in", type: "link", href: "/sign-in" },
+      { label: "Creator Profile", type: "link", href: "/creator-profile" },
+      { label: "Brand Profile", type: "link", href: "/brand-profile" },
     ],
   },
   {

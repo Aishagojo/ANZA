@@ -61,18 +61,18 @@ export function Navbar({
                   href="/"
                   className="text-sm text-text-secondary hover:text-text-primary"
                 >
-                  Landing
+                  Home
                 </Link>
                 <Link
-                  href="/create"
+                  href="/sign-in"
                   className="text-sm text-text-secondary hover:text-text-primary"
                 >
-                  Create Offer
+                  Sign in
                 </Link>
               </nav>
 
-              <Link href="/create">
-                <Button className="!px-4 !py-2 text-sm">Create an Offer</Button>
+              <Link href="/sign-in">
+                <Button className="!px-4 !py-2 text-sm">Continue</Button>
               </Link>
             </>
           )}
