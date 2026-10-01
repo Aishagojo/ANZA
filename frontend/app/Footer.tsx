@@ -59,7 +59,11 @@ const columns: FooterColumn[] = [
         href: "https://github.com/Aishagojo/Group1-H4H#readme",
       },
       { label: "Nostr", type: "external", href: "https://nostr.com" },
-      { label: "Lightning", type: "external", href: "https://lightning.network" },
+      {
+        label: "Lightning",
+        type: "external",
+        href: "https://lightning.network",
+      },
     ],
   },
 ];
@@ -118,7 +122,10 @@ export function Footer() {
           <div className="flex flex-col items-start justify-between gap-8 lg:flex-row">
             {/* Logo & description */}
             <div className="lg:w-1/4">
-              <Link href="/" className="mb-3 inline-flex flex-col items-start gap-3">
+              <Link
+                href="/"
+                className="mb-3 inline-flex flex-col items-start gap-3"
+              >
                 <span className="rounded-md border border-white/10 bg-white/20 p-2 backdrop-blur-sm">
                   <img
                     src="/images/Dynamic%20ANZA%20Media%20Logo.png"
@@ -177,7 +184,8 @@ export function Footer() {
             </span>
             <span className="text-[10px] font-bold text-gray-300">+</span>
             <span className="flex items-center gap-1 rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-bold text-gray-700">
-              <Zap size={12} className="text-bitcoin" aria-hidden /> Bitcoin Lightning
+              <Zap size={12} className="text-bitcoin" aria-hidden /> Bitcoin
+              Lightning
             </span>
           </div>
         </div>

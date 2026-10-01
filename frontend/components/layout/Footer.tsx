@@ -118,11 +118,14 @@ export function Footer() {
           <div className="flex flex-col items-start justify-between gap-8 lg:flex-row">
             {/* Logo & description */}
             <div className="lg:w-1/4">
-              <Link href="/" className="mb-3 inline-flex items-center gap-2">
-                <span className="rounded-md border border-white/10 bg-white/20 p-1 backdrop-blur-sm">
-                  <Radio size={16} aria-hidden />
+              <Link href="/" className="mb-3 inline-flex flex-col items-start gap-3">
+                <span className="rounded-md border border-white/10 bg-white/20 p-2 backdrop-blur-sm">
+                  <img
+                    src="/images/Dynamic%20ANZA%20Media%20Logo.png"
+                    alt="ANZA"
+                    className="h-16 w-auto object-contain sm:h-20"
+                  />
                 </span>
-                <span className="text-base font-bold tracking-tight">ContentPort</span>
               </Link>
               <p className="max-w-[180px] text-xs leading-relaxed text-blue-100">
                 License creator content. Prove the agreement. Pay instantly.
@@ -156,7 +159,7 @@ export function Footer() {
         <div className="mx-auto flex max-w-page flex-col items-center justify-between gap-3 px-6 md:flex-row">
           {/* Left: copyright + system status */}
           <div className="flex flex-col items-center gap-3 text-[11px] font-medium text-gray-600 sm:flex-row">
-            <p>© 2026 ContentPort. Built for Kenyan creators.</p>
+            <p>© 2026 ANZA. Built for Kenyan creators.</p>
             <span className="hidden text-gray-300 sm:block">|</span>
             <span className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700">
               <span className="footer-pulse-dot h-1.5 w-1.5 rounded-full bg-emerald-500" />
