@@ -17,12 +17,20 @@ export function createOfferService({
   // all three the offer stays settled but unlicensed rather than publishing a
   // signature we cannot produce.
   const canIssueLicense = Boolean(licenseKind && attestorSecretKey && signEvent);
+  console.log('[LICENSE] Config check', { licenseKind, hasAttestorSecret: !!attestorSecretKey, hasSigner: !!signEvent, canIssueLicense });
   const issueLicense = async offer => {
-    if (!canIssueLicense) return null;
+    console.log('[LICENSE] issueLicense called', { offerId: offer.id, canIssueLicense, paymentStatus: offer.payment?.status, settledAt: offer.payment?.settled_at });
+    if (!canIssueLicense) {
+      console.log('[LICENSE] Skipping - cannot issue license (missing config)');
+      return null;
+    }
     // Checked before building or signing: the status endpoint is polled
     // repeatedly, and re-signing each time would queue a duplicate license.
     const existing = await store.getLicense(offer.id);
-    if (existing) return existing;
+    if (existing) {
+      console.log('[LICENSE] License already exists for offer', { offerId: offer.id });
+      return existing;
+    }
     const offerEvent = await store.getOfferEvent(offer.id);
     if (!offerEvent) return null;
     const settlement = {
@@ -182,6 +190,7 @@ export function createOfferService({
       // built, signed and queued. Running on every poll means a transient signer
       // or database failure retries without extra machinery.
       if (offer.payment?.status === 'settled' && offer.status !== 'licensed') {
+        console.log('[LICENSE] getStatus: payment settled, attempting issueLicense', { offerId: offer.id });
         await issueLicense(offer);
       }
       const license = offer.status === 'licensed' || offer.payment?.status === 'settled' ? await store.getLicense(offer.id) : null;

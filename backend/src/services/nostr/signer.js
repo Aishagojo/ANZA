@@ -11,9 +11,12 @@ import { finalizeEvent } from 'nostr-tools/pure';
  */
 export function createAttestorSigner(finalize = finalizeEvent) {
   return function signAttestorEvent(template, secretKeyHex) {
+    console.log('[SIGNER] Signing event', { kind: template.kind, eventId: template.id });
     if (typeof secretKeyHex !== 'string' || !/^[0-9a-f]{64}$/.test(secretKeyHex)) {
       throw new TypeError('Attestor secret key must be a 32-byte lowercase hex string.');
     }
-    return finalize(template, Uint8Array.from(Buffer.from(secretKeyHex, 'hex')));
+    const event = finalize(template, Uint8Array.from(Buffer.from(secretKeyHex, 'hex')));
+    console.log('[SIGNER] Event signed', { eventId: event.id, pubkey: event.pubkey });
+    return event;
   };
 }

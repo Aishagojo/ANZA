@@ -30,12 +30,18 @@ function sendToRelay(url, event, { WebSocketImpl, timeoutMs, signal }) {
 export function createRelayPublisher({ relays, WebSocketImpl = globalThis.WebSocket, timeoutMs = 5000 }) {
   if (!relays.length || !WebSocketImpl) throw new Error('At least one relay and a WebSocket implementation are required');
   return async event => {
+    console.log('[RELAY PUBLISHER] Publishing event', { eventId: event.id, kind: event.kind, relays });
     const controller = new AbortController();
     try {
-      return await Promise.any(relays.map(url => sendToRelay(url, event, {
+      const result = await Promise.any(relays.map(url => sendToRelay(url, event, {
         WebSocketImpl, timeoutMs, signal: controller.signal
       })));
-    } catch { throw new Error('No configured relay acknowledged the event'); }
+      console.log('[RELAY PUBLISHER] Event published successfully', { eventId: event.id, relay: result });
+      return result;
+    } catch (error) {
+      console.error('[RELAY PUBLISHER] Failed to publish event', { eventId: event.id, error: error.message });
+      throw error;
+    }
     finally { controller.abort(); }
   };
 }

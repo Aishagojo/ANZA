@@ -81,14 +81,25 @@ export class PostgresOfferStore {
     } finally { client.release(); }
   }
   async publishNext(publish) {
+    console.log('[PUBLISHER] publishNext tick');
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
       const item = (await client.query(`SELECT * FROM nostr_outbox WHERE published_at IS NULL
         AND next_attempt_at <= now() ORDER BY next_attempt_at FOR UPDATE SKIP LOCKED LIMIT 1`)).rows[0];
-      if (!item) { await client.query('COMMIT'); return false; }
+      if (!item) { 
+        console.log('[PUBLISHER] No events to publish');
+        await client.query('COMMIT'); 
+        return false; 
+      }
+      console.log('[PUBLISHER] Found event to publish', { eventId: item.event_id, offerId: item.offer_id, eventRole: item.event_role, attempts: item.attempts });
       let relay;
-      try { relay = await publish(item.event); } catch (error) {
+      try { 
+        console.log('[PUBLISHER] Publishing event to relay', { eventId: item.event_id });
+        relay = await publish(item.event); 
+        console.log('[PUBLISHER] Event published successfully', { eventId: item.event_id, relay });
+      } catch (error) {
+        console.error('[PUBLISHER] Failed to publish event', { eventId: item.event_id, error: error.message });
         const delay = Math.min(300, 2 ** Math.min(item.attempts + 1, 9));
         await client.query(`UPDATE nostr_outbox SET attempts = attempts + 1, last_error = $2,
           next_attempt_at = now() + ($3 * interval '1 second') WHERE event_id = $1`,

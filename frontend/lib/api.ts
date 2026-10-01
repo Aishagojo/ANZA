@@ -92,8 +92,11 @@ export async function createPaymentRequest(offerId: string): Promise<PaymentRequ
   return response.json() as Promise<PaymentRequestResponse>;
 }
 export async function getOfferStatus(offerId: string): Promise<OfferStatusResponse> {
+  console.log('[FRONTEND] Polling status for', offerId);
   const response = await fetch(apiUrl(`/offers/${offerId}/status`));
   if (!response.ok) throw new Error(await errorMessage(response));
-  return response.json() as Promise<OfferStatusResponse>;
+  const data = await response.json() as OfferStatusResponse;
+  console.log('[FRONTEND] Status response:', data);
+  return data;
 }
 export { LICENSE_TYPE_LABELS, LICENSE_TYPE_DESCRIPTIONS };

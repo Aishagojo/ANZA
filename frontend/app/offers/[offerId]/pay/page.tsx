@@ -90,7 +90,10 @@ export default function PaymentPage({
 
     pollRef.current = setInterval(async () => {
       try {
-        const next = phaseFor(await getOfferStatus(params.offerId));
+        console.log('[FRONTEND] Polling getOfferStatus...');
+        const status = await getOfferStatus(params.offerId);
+        console.log('[FRONTEND] Poll result:', status);
+        const next = phaseFor(status);
         if (next) {
           setPhase(next);
           if (pollRef.current) clearInterval(pollRef.current);

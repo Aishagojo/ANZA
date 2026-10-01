@@ -17,25 +17,28 @@ export function buildOfferEvent({ kind, creatorPubkey, attestorPubkey, terms, cr
   });
 }
 // Inputs must already have passed signature and wallet settlement verification.
-// This pure builder does not verify payment, sign events, or publish to relays.
-export function buildLicenseEvent({ kind, attestorPubkey, offerEvent, settlement }) {
-  validate('SignedEvent', offerEvent);
-  validate('Settlement', settlement);
-  const offer = JSON.parse(offerEvent.content);
-  if (offer.schema !== 'contentport.offer.v1') throw new TypeError('Unsupported offer schema');
-  validate('Terms', offer.terms);
-  if (offer.attestor_pubkey !== attestorPubkey) throw new TypeError('Unauthorized attestor');
-  if (settlement.offer_event_id !== offerEvent.id) throw new TypeError('Offer reference mismatch');
-  if (settlement.amount_sats !== offer.terms.amount_sats) throw new TypeError('Payment amount mismatch');
-  if (settlement.settled_at < offerEvent.created_at) throw new TypeError('Settlement predates offer');
-  const endsAt = offer.terms.duration.type === 'perpetual' ? null
-    : settlement.settled_at + offer.terms.duration.days * 86400;
-  if (endsAt !== null) validate('integer', endsAt);
-  return envelope(kind, attestorPubkey, settlement.settled_at,
-    [['e', offerEvent.id], ['p', offerEvent.pubkey], ['t', 'contentport-license-v1']], {
-      schema: 'contentport.license.v1', offer_event_id: offerEvent.id,
-      payment_hash: settlement.payment_hash, amount_sats: settlement.amount_sats,
-      starts_at: settlement.settled_at, ends_at: endsAt,
-      evidence_type: 'contentport-settlement-attestation'
-    });
-}
+  // This pure builder does not verify payment, sign events, or publish to relays.
+  export function buildLicenseEvent({ kind, attestorPubkey, offerEvent, settlement }) {
+    console.log('[EVENTS] buildLicenseEvent called', { kind, attestorPubkey, offerEventId: offerEvent.id, settlement });
+    validate('SignedEvent', offerEvent);
+    validate('Settlement', settlement);
+    const offer = JSON.parse(offerEvent.content);
+    if (offer.schema !== 'contentport.offer.v1') throw new TypeError('Unsupported offer schema');
+    validate('Terms', offer.terms);
+    if (offer.attestor_pubkey !== attestorPubkey) throw new TypeError('Unauthorized attestor');
+    if (settlement.offer_event_id !== offerEvent.id) throw new TypeError('Offer reference mismatch');
+    if (settlement.amount_sats !== offer.terms.amount_sats) throw new TypeError('Payment amount mismatch');
+    if (settlement.settled_at < offerEvent.created_at) throw new TypeError('Settlement predates offer');
+    const endsAt = offer.terms.duration.type === 'perpetual' ? null
+      : settlement.settled_at + offer.terms.duration.days * 86400;
+    if (endsAt !== null) validate('integer', endsAt);
+    const result = envelope(kind, attestorPubkey, settlement.settled_at,
+      [['e', offerEvent.id], ['p', offerEvent.pubkey], ['t', 'contentport-license-v1']], {
+        schema: 'contentport.license.v1', offer_event_id: offerEvent.id,
+        payment_hash: settlement.payment_hash, amount_sats: settlement.amount_sats,
+        starts_at: settlement.settled_at, ends_at: endsAt,
+        evidence_type: 'contentport-settlement-attestation'
+      });
+    console.log('[EVENTS] License event built', { eventId: result.id, endsAt });
+    return result;
+  }
