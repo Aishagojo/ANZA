@@ -2,6 +2,10 @@ import { HttpError } from '../utils/errors.js';
 
 export class PostgresOfferStore {
   constructor(pool) { this.pool = pool; }
+  // The video_id column mirrors document->>'video_id' so discovery and the
+  // creator library can join without scanning the offers jsonb. Keeping it
+  // derived from the document means the two can never disagree.
+  static videoId(document) { return document?.video_id ?? null; }
   async getOffer(id) {
     return (await this.pool.query('SELECT document FROM offers WHERE id = $1', [id])).rows[0]?.document;
   }
@@ -12,8 +16,8 @@ export class PostgresOfferStore {
     const id = document.offerId || document.id;
     if (!id) throw new Error('Offer document must include offerId or id');
     await this.pool.query(
-      'INSERT INTO offers(id, document) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET document = EXCLUDED.document',
-      [id, document]
+      'INSERT INTO offers(id, document, video_id) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET document = EXCLUDED.document, video_id = EXCLUDED.video_id',
+      [id, document, PostgresOfferStore.videoId(document)]
     );
     return document;
   }
@@ -55,11 +59,23 @@ export class PostgresOfferStore {
         return previous.response;
       }
       const response = await work({
-        insertOffer: offer => client.query('INSERT INTO offers(id, document) VALUES ($1, $2)', [offer.id, offer]),
+        insertOffer: offer => client.query('INSERT INTO offers(id, document, video_id) VALUES ($1, $2, $3)',
+          [offer.id, offer, PostgresOfferStore.videoId(offer)]),
         getOfferForUpdate: async id => (await client.query('SELECT document FROM offers WHERE id = $1 FOR UPDATE', [id])).rows[0]?.document,
+        insertVideo: video => client.query('INSERT INTO videos(id, owner_public_key, document) VALUES ($1, $2, $3)',
+          [video.id, video.owner_public_key, video]),
+        issueUploadSession: session => client.query('INSERT INTO upload_sessions(id, owner_public_key, expires_at) VALUES ($1, $2, to_timestamp($3::double precision))',
+          [session.id, session.owner_public_key, session.expires_at]),
+        // Single use and owner scoped: consuming the session in the same
+        // transaction as the insert keeps registration atomic.
+        consumeUploadSession: (id, owner, now) => client
+          .query('DELETE FROM upload_sessions WHERE id = $1 AND owner_public_key = $2 AND expires_at > to_timestamp($3::double precision) RETURNING id',
+            [id, owner, now])
+          .then(result => result.rowCount === 1),
         queueOffer: async (offer, event) => {
           await client.query('INSERT INTO nostr_outbox(event_id, offer_id, event) VALUES ($1, $2, $3)', [event.id, offer.id, event]);
-          await client.query('UPDATE offers SET document = $2, event_id = $3 WHERE id = $1', [offer.id, offer, event.id]);
+          await client.query('UPDATE offers SET document = $2, event_id = $3, video_id = $4 WHERE id = $1',
+            [offer.id, offer, event.id, PostgresOfferStore.videoId(offer)]);
         }
       });
       await client.query('INSERT INTO api_requests(scope, digest, response) VALUES ($1, $2, $3)', [scope, digest, response]);
