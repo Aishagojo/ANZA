@@ -30,8 +30,12 @@ export function Navbar({
           href="/"
           className="flex items-center gap-2 font-semibold text-text-primary"
         >
-          <Radio size={18} className="text-brand" aria-hidden />
-          ContentPort
+          <img
+            src="/images/Dynamic%20ANZA%20Media%20Logo.png"
+            alt="ANZA"
+            className="h-8 w-auto object-contain"
+          />
+          <span>ANZA</span>
         </Link>
 
         <div className="flex items-center gap-4">
