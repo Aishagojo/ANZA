@@ -41,7 +41,9 @@ function uploadToCloudinary(
     form.append("signature", params.signature);
     form.append("folder", params.folder);
     form.append("context", params.context);
-    form.append("resource_type", params.resource_type);
+    // resource_type is deliberately not a form field. It travels in the URL path
+    // and Cloudinary excludes it from the signed parameter string, so sending it
+    // here would be redundant at best.
 
     const request = new XMLHttpRequest();
     request.open("POST", `https://api.cloudinary.com/v1_1/${params.cloud_name}/${params.resource_type}/upload`);

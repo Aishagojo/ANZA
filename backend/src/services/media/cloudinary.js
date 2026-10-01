@@ -34,9 +34,14 @@ export const thumbnailUrl = (media, format) =>
 export const originalUrl = media => deliveryUrl(media);
 
 // Cloudinary signs the sorted, non-empty parameter string with the API secret.
+// The upload API excludes file, cloud_name, resource_type and api_key from that
+// string: resource_type travels in the URL path (/video/upload) rather than as a
+// request parameter, so signing it produces a string Cloudinary never
+// reconstructs and the upload is rejected as an invalid signature.
 function signaturePayload(params) {
+  const unsigned = { file: 1, cloud_name: 1, resource_type: 1, api_key: 1, signature: 1 };
   return Object.keys(params).sort()
-    .filter(key => params[key] !== undefined && params[key] !== null && params[key] !== '')
+    .filter(key => !unsigned[key] && params[key] !== undefined && params[key] !== null && params[key] !== '')
     .map(key => `${key}=${params[key]}`)
     .join('&');
 }
@@ -52,8 +57,12 @@ export function createCloudinary({ cloudName, apiKey, apiSecret, folder }) {
     // a signed Cloudinary context field and must be echoed back at registration,
     // so an asset can only be registered by the creator whose signed
     // authorisation produced it.
-    createUploadAuthorization({ uploadSessionId, timestamp }) {
-      const params = { context: `contentport_session=${uploadSessionId}`, folder, resource_type: RESOURCE_TYPE, timestamp };
+    // Extra parameters (tags, eager transformations, a fixed public_id) are
+    // signed, because Cloudinary signs every request parameter it receives.
+    // signaturePayload strips the media-management keys, so a caller cannot
+    // reintroduce the mismatch.
+    createUploadAuthorization({ uploadSessionId, timestamp, ...signed }) {
+      const params = { ...signed, context: `contentport_session=${uploadSessionId}`, folder, timestamp };
       return {
         cloud_name: cloudName, api_key: apiKey, resource_type: RESOURCE_TYPE, folder,
         context: params.context, upload_session_id: uploadSessionId, timestamp,

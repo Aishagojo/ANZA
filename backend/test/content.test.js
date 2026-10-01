@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHmac } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { createOfferService } from '../src/services/offers/service.js';
 import { createContentService } from '../src/services/content/service.js';
@@ -104,9 +104,36 @@ test('upload authorisation signs parameters and never reveals the Cloudinary sec
   assert.match(body.signature, /^[0-9a-f]{40}$/);
   assert.ok(body.upload_session_id.length >= 16);
   assert.equal(JSON.stringify(body).includes(SECRET), false);
-  // The signature must actually cover the parameters the browser will send.
-  const expected = createHmac('sha1', SECRET).update('').digest('hex');
-  assert.notEqual(expected, body.signature);
+});
+
+// Cloudinary reconstructs the string to sign from the request and rejects the
+// upload as an invalid signature when it differs. This pins the exact payload,
+// because the mismatch is invisible from the signature's shape alone.
+//
+// Cloudinary excludes file, cloud_name, resource_type and api_key. resource_type
+// is the trap: it travels in the upload URL path, not as a request parameter, so
+// signing it produces a string Cloudinary never rebuilds.
+test('the signature covers exactly the string Cloudinary reconstructs', () => {
+  const session = 'a'.repeat(32);
+  const issued = cloudinary.createUploadAuthorization({ uploadSessionId: session, timestamp: 1790888846 });
+  const expected = createHash('sha1')
+    .update(`context=contentport_session=${session}&folder=${FOLDER}&timestamp=1790888846` + SECRET)
+    .digest('hex');
+  assert.equal(issued.signature, expected);
+  assert.equal(issued.resource_type, 'video', 'still returned, the browser needs it for the upload URL');
+  assert.deepEqual(Object.keys(issued).sort(),
+    ['allowed_formats', 'api_key', 'cloud_name', 'context', 'folder', 'resource_type', 'signature', 'timestamp', 'upload_session_id']);
+});
+
+test('a media-management parameter can never leak into the signature', () => {
+  // Guards the general rule rather than the single instance that broke: real
+  // request parameters such as tags are signed, media-management keys are not.
+  const signatureFor = extra => cloudinary
+    .createUploadAuthorization({ uploadSessionId: 'b'.repeat(32), timestamp: 1790888846, ...extra }).signature;
+  assert.notEqual(signatureFor({}), signatureFor({ tags: 'anza' }), 'a real parameter must be signed');
+  for (const excluded of [{ resource_type: 'video' }, { api_key: 'other' }, { cloud_name: 'other' }, { file: 'x' }, { signature: 'x' }]) {
+    assert.equal(signatureFor({}), signatureFor(excluded), `${Object.keys(excluded)[0]} must not be signed`);
+  }
 });
 
 test('a video cannot be registered without a signed upload session, or with a replayed one', async () => {
