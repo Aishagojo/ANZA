@@ -24,7 +24,7 @@ import { ArrowRight } from "lucide-react";
  * set SIGN_IN_HREF to its route, for example "/signin", and it becomes a
  * normal link automatically.
  */
-const SIGN_IN_HREF: string | null = null;
+const SIGN_IN_HREF: string | null = "/sign-in";
 
 const signInClasses =
   "rounded-lg px-1.5 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:text-slate-900 sm:px-3 sm:text-sm max-[379px]:hidden";
