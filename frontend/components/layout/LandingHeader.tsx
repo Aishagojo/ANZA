@@ -76,14 +76,6 @@ export function LandingHeader() {
         >
           <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-t border-white/30 bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-600/30 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:shadow-blue-600/50">
             <BroadcastMark />
-            {/* Live status dot: solid green with a soft expanding ring */}
-            <span
-              aria-hidden="true"
-              className="absolute -right-1 -top-1 flex h-2.5 w-2.5"
-            >
-              <span className="absolute inset-0 rounded-full bg-emerald-400 opacity-60 motion-safe:animate-ping" />
-              <span className="relative h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
-            </span>
           </span>
           <span className="text-base font-bold tracking-tight text-slate-900 transition-colors group-hover:text-blue-700 sm:text-xl">
             ContentPort
