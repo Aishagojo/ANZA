@@ -101,7 +101,7 @@ export async function signHttpAuthorization({
   body = "",
   idempotencyKey,
 }: {
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "DELETE";
   url: string;
   body?: string;
   idempotencyKey?: string;
