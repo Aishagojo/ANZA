@@ -1,4 +1,5 @@
 import { buildCommerceSchemas } from './commerce.js';
+import { buildContentSchemas } from './content.js';
 // Shared JSON Schemas for runtime validation and the API contract.
 const text = { type: 'string', minLength: 1, maxLength: 2000, pattern: '\\S' };
 const hex = { type: 'string', pattern: '^[0-9a-f]{64}$' };
@@ -54,5 +55,16 @@ schemas.SignedEvent = object({
 schemas.PaymentStatus = object({ payment: schemas.Payment, license: nullable(schemas.License) });
 schemas.Error = object({ error: object({ code: text, message: text }) });
 schemas.Settlement = object({ offer_event_id: hex, payment_hash: hex, amount_sats: positive, settled_at: integer });
+// POST /offers accepts either the complete signed Terms, or the same terms
+// without a client-supplied content reference. The content layer fills
+// content_url and content_sha256 from the video record, so the browser is never
+// the authority for the media reference. record-rules enforces the choice.
+schemas.OfferDraft = {
+  type: 'object',
+  properties: { ...schemas.Terms.properties, video_id: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,100}$' } },
+  required: ['brand', 'amount_sats', 'usage_rights', 'duration'],
+  additionalProperties: false
+};
 Object.assign(schemas, buildCommerceSchemas(schemas));
+Object.assign(schemas, buildContentSchemas());
 export const scalarSchemas = { hex, integer };
