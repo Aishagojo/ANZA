@@ -71,14 +71,18 @@ export function LandingHeader() {
         {/* Logo */}
         <Link
           href="/"
-          aria-label="ContentPort — home"
+          aria-label="ANZA — home"
           className="group inline-flex shrink-0 items-center gap-2 rounded-lg sm:gap-2.5"
         >
-          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-t border-white/30 bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-600/30 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:shadow-blue-600/50">
-            <BroadcastMark />
+          <span className="relative flex h-10 shrink-0 items-center justify-center rounded-xl transition-all duration-200 group-hover:-translate-y-0.5">
+            <img
+              src="/images/Dynamic%20ANZA%20Media%20Logo.png"
+              alt="ANZA"
+              className="h-9 w-auto object-contain"
+            />
           </span>
           <span className="text-base font-bold tracking-tight text-slate-900 transition-colors group-hover:text-blue-700 sm:text-xl">
-            ContentPort
+            ANZA
           </span>
         </Link>
 
