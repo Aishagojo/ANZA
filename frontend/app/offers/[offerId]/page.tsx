@@ -10,7 +10,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ContentPreview } from "@/components/offer/ContentPreview";
 import { VerificationCard } from "@/components/offer/VerificationCard";
 import { LicenseDetails } from "@/components/offer/LicenseDetails";
-import { getOffer } from "@/lib/api";
+import { getMyOffer, getOffer } from "@/lib/api";
 import { Offer } from "@/lib/types";
 
 /**
@@ -29,13 +29,23 @@ export default function OfferPage({ params }: { params: { offerId: string } }) {
 
   useEffect(() => {
     let cancelled = false;
-    getOffer(params.offerId)
-      .then((data) => {
+    (async () => {
+      try {
+        // The public read is the fast path and covers every published offer, so
+        // brands never wait on a signer probe. It only fails for an offer the
+        // licensing engine has not published yet, which is exactly the draft a
+        // creator opened from their own library, so retry that with a signature.
+        let data: Offer;
+        try {
+          data = await getOffer(params.offerId);
+        } catch {
+          data = await getMyOffer(params.offerId);
+        }
         if (!cancelled) setOffer(data);
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setError("not-found");
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -76,7 +86,8 @@ export default function OfferPage({ params }: { params: { offerId: string } }) {
   return <PublicOfferView offer={offer} />;
 }
 
-/** Screen 3 — spec section 11/12/13 */
+/** Screen 3 — Brand-facing offer detail. Also used for a creator's own draft. */
+const PENDING_EVENT = "Pending relay acknowledgement";
 function PublicOfferView({ offer }: { offer: Offer }) {
   return (
     <main>
@@ -106,10 +117,16 @@ function PublicOfferView({ offer }: { offer: Offer }) {
             </div>
           </div>
 
-          {/* Only show the purchase CTA while the offer is still open —
-              never once it's LICENSED (this whole branch only renders
-              pre-LICENSED anyway, but PAYMENT_PENDING also hides it). */}
-          {offer.status === "OPEN" && (
+          {/* An offer with no event id yet is still a draft. Only its creator can
+              reach this page, and the licensing engine will not issue an invoice
+              for an unpublished offer, so there is nothing to purchase. */}
+          {offer.nostrEventId === PENDING_EVENT && (
+            <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              This offer is still a draft. Publish it from your library before a
+              brand can license it.
+            </div>
+          )}
+          {offer.status === "OPEN" && offer.nostrEventId !== PENDING_EVENT && (
             <Link href={`/offers/${offer.offerId}/pay`} className="mt-6 block">
               <Button fullWidth>Purchase License</Button>
             </Link>
@@ -123,9 +140,11 @@ function PublicOfferView({ offer }: { offer: Offer }) {
           )}
         </Card>
 
-        <div className="mt-6">
-          <VerificationCard eventId={offer.nostrEventId} />
-        </div>
+        {offer.nostrEventId !== PENDING_EVENT && (
+          <div className="mt-6">
+            <VerificationCard eventId={offer.nostrEventId} />
+          </div>
+        )}
       </div>
     </main>
   );

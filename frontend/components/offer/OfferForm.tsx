@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Input, Textarea, Select } from "@/components/ui/FormFields";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { createOffer } from "@/lib/api";
+import { createOffer, getMyVideo } from "@/lib/api";
 import { LicenseType, CreateOfferPayload } from "@/lib/types";
 import { probeSigner, SignerProbe } from "@/lib/nostr";
 import {
@@ -31,6 +31,12 @@ type Errors = Partial<Record<keyof FormState, string>>;
 /** Spec section 9/10 — validates, shows a preview, then publishes via lib/api.createOffer. */
 export function OfferForm() {
   const router = useRouter();
+  // Arriving from a video card puts the selected video in the address. The form
+  // then submits only its id, so the backend resolves the content reference and
+  // fingerprint from the video record instead of trusting a pasted URL.
+  const videoId = useSearchParams().get("videoId");
+  const [linkedVideo, setLinkedVideo] = useState<{ id: string; title: string } | null>(null);
+  const [videoError, setVideoError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<Errors>({});
   const [step, setStep] = useState<"edit" | "preview">("edit");
@@ -63,6 +69,36 @@ export function OfferForm() {
     };
   }, []);
 
+  // Only the authenticated creator can read their own video, so a foreign or
+  // mistyped id fails here rather than at publish time.
+  useEffect(() => {
+    if (!videoId) return;
+    let cancelled = false;
+    setVideoError(null);
+    getMyVideo(videoId)
+      .then((owned) => {
+        if (cancelled) return;
+        setLinkedVideo({ id: owned.video.id, title: owned.video.title });
+        setForm((prev) => ({
+          ...prev,
+          title: prev.title || owned.video.title,
+          // Shown for context only. The server re-derives this value itself.
+          contentUrl: owned.preview_url,
+        }));
+      })
+      .catch((cause) => {
+        if (cancelled) return;
+        setVideoError(
+          cause instanceof Error
+            ? cause.message
+            : "That video could not be loaded.",
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [videoId]);
+
   function handleLicenseTypeChange(type: LicenseType) {
     setForm((prev) => ({
       ...prev,
@@ -80,8 +116,11 @@ export function OfferForm() {
     const next: Errors = {};
     if (!form.title.trim()) next.title = "Content title is required.";
     if (!form.description.trim()) next.description = "Description is required.";
-    if (!/^https?:\/\/.+/.test(form.contentUrl.trim()))
+    // A video-backed offer does not need a typed URL: the server resolves it.
+    if (!linkedVideo && !/^https?:\/\/.+/.test(form.contentUrl.trim()))
       next.contentUrl = "Please enter a valid content URL.";
+    if (Boolean(videoId) && !linkedVideo)
+      next.contentUrl = videoError ?? "Waiting for your video to load.";
     if (!form.brandName.trim()) next.brandName = "Brand is required.";
     if (!form.priceSats || form.priceSats <= 0)
       next.priceSats = "Price must be greater than 0.";
@@ -111,7 +150,10 @@ export function OfferForm() {
   }
     try {
 
-      const res = await createOffer(form);
+      const res = await createOffer({
+        ...form,
+        videoId: linkedVideo ? linkedVideo.id : undefined,
+      });
       // BACKEND TEAM: res.publicUrl is returned by POST /api/offers — we use
       // res.offerId directly since our route is always /offers/:offerId.
       router.push(`/offers/${res.offerId}`);
@@ -141,7 +183,14 @@ export function OfferForm() {
         <dl className="mb-6 space-y-4 rounded-lg bg-surface p-5">
           <PreviewRow label="Content title" value={form.title} />
           <PreviewRow label="Description" value={form.description} />
-          <PreviewRow label="Content URL" value={form.contentUrl} />
+          <PreviewRow
+            label="Content URL"
+            value={
+              linkedVideo
+                ? `${form.contentUrl}  (resolved from your video at publish time)`
+                : form.contentUrl
+            }
+          />
           <PreviewRow label="Brand" value={form.brandName} />
           <PreviewRow label="Price" value={`${form.priceSats.toLocaleString()} sats`} />
           <PreviewRow label="License type" value={LICENSE_TYPE_LABELS[form.licenseType]} />
@@ -177,6 +226,27 @@ export function OfferForm() {
   return (
     <Card>
       <form onSubmit={handlePreview} className="space-y-5">
+        {videoId && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
+            {linkedVideo ? (
+              <>
+                <p className="font-medium text-blue-900">
+                  Creating an offer for “{linkedVideo.title}”
+                </p>
+                <p className="mt-1 text-blue-800">
+                  Only the video id is sent. The backend looks up the canonical
+                  reference and fingerprint, so this offer always points at the
+                  asset you uploaded.
+                </p>
+              </>
+            ) : (
+              <p className="text-blue-900">
+                {videoError ?? "Loading your video…"}
+              </p>
+            )}
+          </div>
+        )}
+
         <Input
           label="Content Title"
           placeholder="Summer Campaign Video"
@@ -196,7 +266,13 @@ export function OfferForm() {
         <Input
           label="Content URL"
           placeholder="https://res.cloudinary.com/..."
-          hint="Use a publicly accessible image or video URL."
+          hint={
+            linkedVideo
+              ? "Filled from your video. The backend re-resolves this reference and signs its fingerprint, so brands only ever see the watermarked preview."
+              : "Use a publicly accessible image or video URL."
+          }
+          readOnly={Boolean(linkedVideo)}
+          className={linkedVideo ? "bg-surface text-text-secondary" : ""}
           value={form.contentUrl}
           onChange={(e) => update("contentUrl", e.target.value)}
           error={errors.contentUrl}
