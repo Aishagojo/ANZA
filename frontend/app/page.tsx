@@ -104,10 +104,10 @@ export default function LandingPage() {
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3 sm:gap-4">
                 <Link
-                  href="/create"
+                  href="/sign-in"
                   className="group inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-600/40 active:translate-y-0"
                 >
-                  Create an Offer
+                  Continue
                   <ArrowRight
                     size={16}
                     aria-hidden
