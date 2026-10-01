@@ -1,11 +1,16 @@
 import { createServer } from 'node:http';
 import { authenticate, sha256 } from './middleware/auth.js';
 import { matchOfferRoute, matchWebhookRoute } from './routes/offers.js';
+import { matchVideoRoute } from './routes/content.js';
 import { createOfferController } from './controllers/offers.js';
+import { createContentController } from './controllers/content.js';
 import { HttpError } from './utils/errors.js';
 
-export function createApp({ service, verifyEvent, origin, corsOrigin = null, now = () => Math.floor(Date.now() / 1000), onError = console.error }) {
+export function createApp({ service, contentService = null, verifyEvent, origin, corsOrigin = null, now = () => Math.floor(Date.now() / 1000), onError = console.error }) {
   const controller = createOfferController(service);
+  const contentController = createContentController(contentService || new Proxy({}, { get: () => () => {
+    throw new HttpError(501, 'CONTENT_NOT_CONFIGURED', 'The content layer is not available.');
+  } }));
   const isAllowedOrigin = value => {
     if (!value) return false;
     try {
@@ -20,7 +25,7 @@ export function createApp({ service, verifyEvent, origin, corsOrigin = null, now
     if (requestOrigin && isAllowedOrigin(requestOrigin)) {
       response.setHeader('Access-Control-Allow-Origin', requestOrigin);
       response.setHeader('Vary', 'Origin');
-      response.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      response.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
       response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key');
       response.setHeader('Access-Control-Max-Age', '600');
     }
@@ -36,7 +41,8 @@ export function createApp({ service, verifyEvent, origin, corsOrigin = null, now
     try {
       if (!request.url.startsWith('/') || request.url.startsWith('//')) throw new HttpError(400, 'VALIDATION_ERROR', 'Invalid request URL.');
       const url = new URL(request.url, origin);
-      const route = matchWebhookRoute(request.method, url.pathname) || matchOfferRoute(request.method, url.pathname);
+      const route = matchWebhookRoute(request.method, url.pathname) || matchOfferRoute(request.method, url.pathname)
+        || matchVideoRoute(request.method, url.pathname);
       if (!route) throw new HttpError(404, 'NOT_FOUND', 'Endpoint not found.');
       const chunks = [];
       let bytes = 0;
@@ -67,7 +73,7 @@ export function createApp({ service, verifyEvent, origin, corsOrigin = null, now
       let pubkey;
       if (needsAuth) pubkey = authenticate({ authorization: request.headers.authorization, method: request.method,
         url: origin + request.url, rawBody, idempotencyKey: key, verifyEvent, now: now() });
-      const result = await controller[route.action]({ id: route.id, pubkey, body, key, digest: sha256(rawBody) });
+      const result = await (route.scope === 'content' ? contentController : controller)[route.action]({ id: route.id, pubkey, body, key, digest: sha256(rawBody) });
       response.writeHead(result.status);
       response.end(JSON.stringify(result.body));
     } catch (error) {
