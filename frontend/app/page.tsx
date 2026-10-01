@@ -55,6 +55,26 @@ export default function LandingPage() {
     <>
       <LandingHeader />
 
+      {/* Browser extension notice: keep the alert at the top of the landing page and link straight to the nos2x install page. */}
+      <div className="border-b border-amber-200 bg-gradient-to-r from-amber-100 via-orange-50 to-yellow-50">
+        <div className="mx-auto flex max-w-page flex-col items-center justify-between gap-3 px-4 py-3 text-sm text-slate-800 sm:flex-row sm:px-6">
+          <p className="flex items-center gap-2 font-medium">
+            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white">
+              Notice
+            </span>
+            Install the nos2x browser extension to publish and verify offers.
+          </p>
+          <a
+            href="https://chromewebstore.google.com/detail/nos2x/kpgefcfmnafjgpblomihpgmejjdanjjp"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-sm transition-colors hover:bg-amber-50"
+          >
+            Install nos2x
+          </a>
+        </div>
+      </div>
+
       <main>
         <div className="relative isolate overflow-x-clip bg-gradient-to-b from-white via-slate-50 to-slate-100">
           {/* Ambient glows: pure decoration, they fade out on their own */}
@@ -110,7 +130,7 @@ export default function LandingPage() {
                   <div className="overflow-hidden rounded-xl">
                     <img
                       src="/images/landing.png"
-                      alt="ContentPort workflow — Create, Publish, Get Paid, Verify"
+                      alt="ANZA workflow — Create, Publish, Get Paid, Verify"
                       width={1536}
                       height={1024}
                       loading="eager"
