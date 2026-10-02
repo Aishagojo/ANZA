@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { ArrowLeft, ShieldCheck, Radio } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { NavButton } from "@/components/ui/NavButton";
 
 /**
  * Simple global nav (spec section 7). Deliberately does NOT include
@@ -56,19 +57,9 @@ export function Navbar({
 
           {!backHref && (
             <>
-              <nav className="hidden items-center gap-3 text-sm sm:flex">
-                <Link
-                  href="/"
-                  className="text-sm text-text-secondary hover:text-text-primary"
-                >
-                  Home
-                </Link>
-                <Link
-                  href="/sign-in"
-                  className="text-sm text-text-secondary hover:text-text-primary"
-                >
-                  Sign in
-                </Link>
+              <nav className="hidden items-center gap-2 text-sm sm:flex">
+                <NavButton kind="home" />
+                <NavButton kind="sign-in" />
               </nav>
 
               <Link href="/sign-in">

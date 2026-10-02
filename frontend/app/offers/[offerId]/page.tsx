@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ContentPreview } from "@/components/offer/ContentPreview";
 import { VerificationCard } from "@/components/offer/VerificationCard";
 import { LicenseDetails } from "@/components/offer/LicenseDetails";
+import { DownloadButton } from "@/components/offer/DownloadButton";
 import { getMyOffer, getOffer } from "@/lib/api";
 import { Offer } from "@/lib/types";
 
@@ -253,6 +254,17 @@ function LicensedView({ offer }: { offer: Offer }) {
               <Calendar size={14} /> Licensed
             </div>
             <p className="mt-1 text-sm font-medium text-text-primary">{licensedDate}</p>
+          </div>
+
+          {/* Download: the license holder can save the video file. */}
+          <div className="mt-6 flex flex-col gap-4 rounded-xl border border-blue-100 bg-blue-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-navy">Your licensed video</p>
+              <p className="mt-0.5 text-xs text-text-secondary">
+                Download the file and use it under the license terms above.
+              </p>
+            </div>
+            <DownloadButton url={offer.contentUrl} title={offer.title} />
           </div>
 
           <div className="mt-6 border-t border-border pt-6">
