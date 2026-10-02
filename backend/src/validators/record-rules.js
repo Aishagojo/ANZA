@@ -27,4 +27,21 @@ export function validateRecordRules(name, value) {
       'paid order requires payment and license references');
     else check(value.license_id === null, 'unpaid order must not have a license');
   }
+  if (name === 'OfferDraft') {
+    // The content reference is either supplied whole or resolved from the
+    // caller's own video. Half-supplied content is never accepted, and a video
+    // reference is authoritative so it cannot be overridden by a pasted URL.
+    check(Boolean(value.video_id) !== Boolean(value.content_url),
+      'supply either video_id or content_url, not both and not neither');
+    if (!value.video_id) check(Boolean(value.content_sha256),
+      'content_url requires the matching content_sha256');
+  }
+  if (name === 'VideoRegistration') {
+    const session = String(value.context || '').split('=')[1];
+    check(session === value.upload_session_id, 'context must echo the signed upload session');
+  }
+  if (name === 'Video') {
+    check(value.updated_at >= value.created_at, 'updated_at cannot precede created_at');
+    check(value.public_id.includes('/'), 'public_id must retain its ContentPort folder prefix');
+  }
 }

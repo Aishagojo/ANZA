@@ -5,6 +5,9 @@ import { finalizeEvent } from 'nostr-tools/pure';
 import { buildOfferEvent, buildLicenseEvent } from '../nostr/events.js';
 import { HttpError } from '../../utils/errors.js';
 import { verifySpeedWebhook } from '../payments/speed.js';
+import { mediaRef, previewUrl, thumbnailUrl } from '../media/cloudinary.js';
+
+const DISCOVERY_LIMIT = 50;
 
 export function createOfferService({ store, verifyEvent, kind, attestorPubkey, attestorSecretKey = null, speedWebhookSecret, paymentProvider = null, now = () => Math.floor(Date.now() / 1000) }) {
   const input = (schema, body) => {
@@ -42,16 +45,50 @@ export function createOfferService({ store, verifyEvent, kind, attestorPubkey, a
   };
   return {
     async create({ pubkey, body, key, digest }) {
-      input('Terms', body);
-      try {
-        const url = new URL(body.content_url);
-        if (url.protocol !== 'https:' || url.username || url.password) throw new Error();
-      } catch { throw new HttpError(400, 'VALIDATION_ERROR', 'Content URL must be a valid public HTTPS reference.'); }
+      input('OfferDraft', body);
+      const { video_id: videoId, ...rest } = body;
+      let terms;
+      if (videoId) {
+        // The content layer resolves the canonical reference. The browser never
+        // supplies the media URL for a video-backed offer, so it cannot point
+        // an offer at an asset it does not own or at someone else's content.
+        const video = await store.getOwnedVideo(videoId, pubkey);
+        if (!video) throw new HttpError(404, 'NOT_FOUND', 'Video not found.');
+        if (video.status !== 'ready') throw new HttpError(409, 'VIDEO_NOT_READY', 'This video is still processing and cannot be offered yet.');
+        terms = { ...rest, content_url: previewUrl(mediaRef(video)), content_sha256: video.reference_sha256 };
+      } else {
+        terms = { ...body };
+        try {
+          const url = new URL(terms.content_url);
+          if (url.protocol !== 'https:' || url.username || url.password) throw new Error();
+        } catch { throw new HttpError(400, 'VALIDATION_ERROR', 'Content URL must be a valid public HTTPS reference.'); }
+      }
       return store.idempotent(`${pubkey}:POST:/offers:${key}`, digest, async tx => {
-        const offer = { id: randomUUID(), creator_pubkey: pubkey, terms: body, status: 'draft', event_id: null, created_at: now() };
+        const offer = { id: randomUUID(), creator_pubkey: pubkey, terms, status: 'draft', event_id: null,
+          ...(videoId ? { video_id: videoId } : {}), created_at: now() };
         await tx.insertOffer(offer);
         return { status: 201, body: offer };
       });
+    },
+    // Brand discovery. Eligibility is decided here, not by the frontend: only
+    // offers the licensing engine already published are listed, an offer that
+    // is already licensed is no longer purchasable and is not offered again, and
+    // the projection carries a watermarked preview rather than the original.
+    async discover() {
+      const rows = await store.listDiscoverableOffers(DISCOVERY_LIMIT);
+      return { status: 200, body: { offers: rows.map(({ offer, video }) => {
+        const media = video ? mediaRef(video) : null;
+        return {
+          offer_id: offer.id, video_id: offer.video_id ?? null,
+          title: offer.terms.title ?? null, description: offer.terms.description ?? null,
+          creator_public_key: offer.creator_pubkey,
+          preview_url: media ? previewUrl(media) : offer.terms.content_url,
+          thumbnail_url: media ? thumbnailUrl(media) : null,
+          duration_seconds: video?.duration_seconds ?? null,
+          license_duration: offer.terms.duration, price_sats: offer.terms.amount_sats,
+          status: offer.status, created_at: offer.created_at
+        };
+      }) } };
     },
     async get(id, pubkey) {
       const stored = await store.getOffer(id);

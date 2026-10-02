@@ -30,8 +30,12 @@ export function Navbar({
           href="/"
           className="flex items-center gap-2 font-semibold text-text-primary"
         >
-          <Radio size={18} className="text-brand" aria-hidden />
-          ContentPort
+          <img
+            src="/images/Dynamic%20ANZA%20Media%20Logo.png"
+            alt="ANZA"
+            className="h-8 w-auto object-contain"
+          />
+          <span>ANZA</span>
         </Link>
 
         <div className="flex items-center gap-4">
@@ -57,18 +61,18 @@ export function Navbar({
                   href="/"
                   className="text-sm text-text-secondary hover:text-text-primary"
                 >
-                  Landing
+                  Home
                 </Link>
                 <Link
-                  href="/create"
+                  href="/sign-in"
                   className="text-sm text-text-secondary hover:text-text-primary"
                 >
-                  Create Offer
+                  Sign in
                 </Link>
               </nav>
 
-              <Link href="/create">
-                <Button className="!px-4 !py-2 text-sm">Create an Offer</Button>
+              <Link href="/sign-in">
+                <Button className="!px-4 !py-2 text-sm">Continue</Button>
               </Link>
             </>
           )}
