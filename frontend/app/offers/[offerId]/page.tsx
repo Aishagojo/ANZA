@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle, ExternalLink, Calendar } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, CheckCircle, ExternalLink, Calendar } from "lucide-react";
+import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ContentPreview } from "@/components/offer/ContentPreview";
 import { VerificationCard } from "@/components/offer/VerificationCard";
 import { LicenseDetails } from "@/components/offer/LicenseDetails";
+import { DownloadButton } from "@/components/offer/DownloadButton";
 import { getMyOffer, getOffer } from "@/lib/api";
 import { Offer } from "@/lib/types";
 
@@ -53,9 +55,8 @@ export default function OfferPage({ params }: { params: { offerId: string } }) {
 
   if (error) {
     return (
-      <main>
-        <Navbar backHref="/" />
-        <div className="mx-auto max-w-xl px-6 py-16 text-center">
+      <AppShell role="brand" width="max-w-xl">
+        <div className="text-center">
           <h1 className="text-lg font-semibold text-text-primary">
             Unable to load this offer.
           </h1>
@@ -64,7 +65,7 @@ export default function OfferPage({ params }: { params: { offerId: string } }) {
             unavailable.
           </p>
         </div>
-      </main>
+    </AppShell>
     );
   }
 
@@ -72,12 +73,11 @@ export default function OfferPage({ params }: { params: { offerId: string } }) {
     // BACKEND TEAM: replace with a skeleton component once real network
     // latency is in play — a plain loading line is enough for the mock.
     return (
-      <main>
-        <Navbar backHref="/" />
-        <div className="mx-auto max-w-3xl px-6 py-16 text-center text-sm text-text-secondary">
+      <AppShell role="brand" width="max-w-3xl">
+        <div className="text-center text-sm text-text-secondary">
           Loading offer…
         </div>
-      </main>
+    </AppShell>
     );
   }
 
@@ -88,15 +88,28 @@ export default function OfferPage({ params }: { params: { offerId: string } }) {
 
 /** Screen 3 — Brand-facing offer detail. Also used for a creator's own draft. */
 const PENDING_EVENT = "Pending relay acknowledgement";
+function BackButton() {
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      onClick={() => router.back()}
+      className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition-colors hover:text-brand"
+    >
+      <ArrowLeft size={16} /> Back
+    </button>
+  );
+}
+
 function PublicOfferView({ offer }: { offer: Offer }) {
   return (
-    <main>
-      <Navbar backHref="/" verified />
-      <div className="mx-auto max-w-3xl px-6 py-10">
+    <AppShell role="brand" verified width="max-w-3xl">
+        <div className="anza-fade-up">
+        <BackButton />
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
           <ContentPreview url={offer.contentUrl} title={offer.title} />
           <div>
-            <h1 className="text-2xl font-bold text-text-primary">{offer.title}</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight text-navy">{offer.title}</h1>
             <p className="mt-1 text-sm text-text-secondary">
               Created by {offer.creatorHandle}
             </p>
@@ -146,7 +159,7 @@ function PublicOfferView({ offer }: { offer: Offer }) {
           </div>
         )}
       </div>
-    </main>
+    </AppShell>
   );
 }
 
@@ -159,14 +172,13 @@ function PaymentConfirmedView({ offer }: { offer: Offer }) {
     : "Confirmed by Lightning node";
 
   return (
-    <main>
-      <Navbar backHref="/" verified />
-      <div className="mx-auto max-w-2xl px-6 py-12 text-center">
+    <AppShell role="brand" verified width="max-w-2xl">
+        <div className="text-center">
         <CheckCircle size={56} className="mx-auto text-success" />
         <p className="mt-4 text-sm font-semibold uppercase tracking-[0.18em] text-success">
           Lightning settlement verified
         </p>
-        <h1 className="mt-2 text-3xl font-bold text-text-primary">Payment Confirmed</h1>
+        <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-navy">Payment Confirmed</h1>
         <p className="mt-2 text-sm text-text-secondary">
           {offer.priceSats.toLocaleString()} sats has settled to the Creator node.
         </p>
@@ -207,7 +219,7 @@ function PaymentConfirmedView({ offer }: { offer: Offer }) {
           </p>
         </div>
       </div>
-    </main>
+    </AppShell>
   );
 }
 
@@ -222,11 +234,10 @@ function LicensedView({ offer }: { offer: Offer }) {
     : "—";
 
   return (
-    <main>
-      <Navbar backHref="/" />
-      <div className="mx-auto max-w-2xl px-6 py-12 text-center">
+    <AppShell role="brand" width="max-w-2xl">
+        <div className="text-center">
         <CheckCircle size={56} className="mx-auto text-success" />
-        <h1 className="mt-4 text-2xl font-bold text-success">LICENSED</h1>
+        <h1 className="mt-4 text-2xl font-extrabold tracking-tight text-success">LICENSED</h1>
         <p className="mt-1 text-sm text-text-secondary">
           Your license has been confirmed.
         </p>
@@ -243,6 +254,17 @@ function LicensedView({ offer }: { offer: Offer }) {
               <Calendar size={14} /> Licensed
             </div>
             <p className="mt-1 text-sm font-medium text-text-primary">{licensedDate}</p>
+          </div>
+
+          {/* Download: the license holder can save the video file. */}
+          <div className="mt-6 flex flex-col gap-4 rounded-xl border border-blue-100 bg-blue-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-navy">Your licensed video</p>
+              <p className="mt-0.5 text-xs text-text-secondary">
+                Download the file and use it under the license terms above.
+              </p>
+            </div>
+            <DownloadButton url={offer.contentUrl} title={offer.title} />
           </div>
 
           <div className="mt-6 border-t border-border pt-6">
@@ -286,6 +308,6 @@ function LicensedView({ offer }: { offer: Offer }) {
           </div>
         </Card>
       </div>
-    </main>
+    </AppShell>
   );
 }

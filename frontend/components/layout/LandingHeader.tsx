@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { NavButton } from "@/components/ui/NavButton";
 
 /**
  * Header of the LANDING PAGE ONLY (app/page.tsx).
@@ -11,7 +11,8 @@ import { ArrowRight } from "lucide-react";
  * pill...). The footer is global and lives in app/layout.tsx, so it is not
  * touched here.
  *
- * Contains exactly three things: the logo, "Sign in", and "Create an Offer".
+ * Contains exactly two things: the logo and the "Sign in" button
+ * (the "Create an Offer" button was removed from this header).
  *
  * Behaviour: at the very top of the page the header is fully transparent, so
  * it melts into the page background (no line, no shadow, no visible band).
@@ -25,9 +26,6 @@ import { ArrowRight } from "lucide-react";
  * normal link automatically.
  */
 const SIGN_IN_HREF: string | null = "/sign-in";
-
-const signInClasses =
-  "rounded-lg px-1.5 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:text-slate-900 sm:px-3 sm:text-sm max-[379px]:hidden";
 
 // Brand refresh: the site name is now ANZA, so the marketing header uses the official logo asset from the public images folder.
 function BrandLogo() {
@@ -75,32 +73,7 @@ export function LandingHeader() {
 
         {/* Actions */}
         <div className="flex shrink-0 items-center gap-1 sm:gap-3">
-          {SIGN_IN_HREF ? (
-            <Link href={SIGN_IN_HREF} className={signInClasses}>
-              Sign in
-            </Link>
-          ) : (
-            <button
-              type="button"
-              aria-disabled="true"
-              title="Sign in — coming soon"
-              className={`${signInClasses} cursor-not-allowed`}
-            >
-              Sign in
-            </button>
-          )}
-
-          <Link
-            href="/create"
-            className="group inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-blue-600 px-3 py-2.5 text-[13px] font-semibold text-white shadow-lg shadow-blue-600/30 transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-600/40 active:translate-y-0 sm:px-5 sm:text-sm"
-          >
-            Create an Offer
-            <ArrowRight
-              size={16}
-              aria-hidden="true"
-              className="hidden shrink-0 transition-transform duration-200 group-hover:translate-x-1 min-[400px]:block"
-            />
-          </Link>
+          <NavButton kind="sign-in" href={SIGN_IN_HREF ?? undefined} disabled={!SIGN_IN_HREF} />
         </div>
       </div>
     </header>

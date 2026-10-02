@@ -7,8 +7,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ShieldCheck } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
+import Link from "next/link";
+import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { AppShell } from "@/components/layout/AppShell";
 import { Card } from "@/components/ui/Card";
 import { ContentPreview } from "@/components/offer/ContentPreview";
 import { LightningQR } from "@/components/payment/LightningQR";
@@ -96,30 +97,33 @@ export default function PaymentPage({
 
   if (error) {
     return (
-      <main>
-        <Navbar backHref={`/offers/${params.offerId}`} />
-        <div className="mx-auto max-w-xl px-6 py-16 text-center text-sm text-text-secondary">
+      <AppShell role="brand" width="max-w-xl">
+        <div className="text-center text-sm text-text-secondary">
           {error}
         </div>
-      </main>
+    </AppShell>
     );
   }
 
   if (!offer || !payment) {
     return (
-      <main>
-        <Navbar backHref={`/offers/${params.offerId}`} />
-        <div className="mx-auto max-w-3xl px-6 py-16 text-center text-sm text-text-secondary">
+      <AppShell role="brand" width="max-w-3xl">
+        <div className="text-center text-sm text-text-secondary">
           Preparing your Lightning invoice…
         </div>
-      </main>
+    </AppShell>
     );
   }
 
   return (
-    <main>
-      <Navbar backHref={`/offers/${offer.offerId}`} />
-      <div className="mx-auto max-w-6xl px-6 py-10">
+    <AppShell role="brand" width="max-w-6xl">
+        <div className="anza-fade-up">
+          <Link
+            href={`/offers/${offer.offerId}`}
+            className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 transition-colors hover:text-brand"
+          >
+            <ArrowLeft size={16} /> Back to offer
+          </Link>
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
           {/* LEFT: license summary */}
           <div>
@@ -231,6 +235,6 @@ export default function PaymentPage({
           </Card>
         </div>
       </div>
-    </main>
+    </AppShell>
   );
 }

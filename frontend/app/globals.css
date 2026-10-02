@@ -10,9 +10,42 @@
   }
 }
 
+/* The font is applied on <html> as well as <body>, with a sans-serif fallback,
+   so no screen can ever fall back to the browser's default serif. */
+html {
+  font-family: var(--font-inter, Inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
 body {
   background-color: #ffffff;
   color: #0f172a;
+}
+
+/* ───────── Creator / Brand app screens (components/layout/AppShell.tsx) ───────── */
+
+/* Soft blue-white wash behind every screen after the role choice */
+.anza-bg {
+  background:
+    radial-gradient(60rem 30rem at 85% -10%, rgb(219 234 254 / 0.9), transparent 60%),
+    radial-gradient(50rem 28rem at -10% 10%, rgb(224 242 254 / 0.8), transparent 60%),
+    #f5f8fd;
+}
+
+@keyframes anza-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes anza-pop {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.anza-fade-up { animation: anza-fade-up 0.35s ease-out both; }
+.anza-pop     { animation: anza-pop 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anza-fade-up,
+  .anza-pop { animation: none; }
 }
 
 /* Visible keyboard focus ring, kept consistent across the app */

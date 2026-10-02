@@ -32,7 +32,7 @@ export function StatusBadge({ status }: { status: OfferStatus }) {
   const { label, classes, icon } = CONFIG[status];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${classes}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${classes}`}
     >
       {icon}
       {label}
