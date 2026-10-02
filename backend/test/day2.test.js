@@ -207,6 +207,23 @@ test('configuration rejects missing keys and insecure non-local relays', () => {
   assert.equal(matchOfferRoute('POST', '/api/offers/abc/publish').action, 'publish');
 });
 
+test('CORS permits the deployed frontend and rejects unrelated HTTPS origins', async () => {
+  const { service } = setup();
+  const frontend = 'https://contentport-frontend.onrender.com';
+  const app = createApp({ service, verifyEvent: () => true, origin: 'https://api.example.com', corsOrigin: frontend });
+  for (const [origin, allowed] of [[frontend, true], ['https://unrelated.example.com', false], [frontend + '.evil.example', false], ['http://localhost:3001', true]]) {
+    const headers = {};
+    let status;
+    await new Promise(resolve => app.emit('request', { method: 'OPTIONS', headers: { origin } }, {
+      setHeader(name, value) { headers[name] = value; },
+      writeHead(code) { status = code; }, end() { resolve(); }
+    }));
+    assert.equal(status, 204);
+    assert.equal(headers['Access-Control-Allow-Origin'], allowed ? origin : undefined);
+  }
+  app.close();
+});
+
 test('HTTP routing returns JSON, validates auth, and creates an offer', async () => {
   const { service } = setup();
   const app = createApp({ service, verifyEvent: () => true, origin: 'http://localhost:3000', now: () => 1000 });

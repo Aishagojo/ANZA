@@ -13,6 +13,7 @@ export function createApp({ service, contentService = null, verifyEvent, origin,
   } }));
   const isAllowedOrigin = value => {
     if (!value) return false;
+    if (corsOrigin && value === corsOrigin) return true;
     try {
       const url = new URL(value);
       return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
