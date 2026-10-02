@@ -10,8 +10,8 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, BriefcaseBusiness, Search } from "lucide-react";
-import { Navbar } from "@/components/layout/Navbar";
+import { Play, Search, SearchX } from "lucide-react";
+import { AppShell, PageHeader } from "@/components/layout/AppShell";
 import { creatorHandle, discoverOffers, formatDuration, licenseType } from "@/lib/api";
 import { DiscoveryListing } from "@/lib/types";
 import { LICENSE_TYPE_LABELS } from "@/lib/licenseTypes";
@@ -61,155 +61,108 @@ export default function BrandProfilePage() {
   }, [offers, query, filter]);
 
   return (
-    <>
-      <Navbar />
-      <main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-800">
-        <div className="mx-auto max-w-6xl rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.05)]">
-          <div className="grid min-h-[calc(100vh-3rem)] lg:grid-cols-[260px_minmax(0,1fr)]">
-            <aside className="border-r border-slate-200 bg-slate-50/80 p-5">
-              <div className="flex items-center gap-3 border-b border-slate-200 pb-5">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-white">
-                  <BriefcaseBusiness size={24} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-700">@brand</p>
-                  <p className="text-xs text-slate-500">Licensing feed</p>
-                </div>
-              </div>
-
-              <nav className="mt-5 space-y-3">
-                <span className="flex w-full items-center gap-3 rounded-xl bg-blue-50 px-3 py-3 text-left font-semibold text-blue-700">
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white text-blue-700">
-                    <ArrowUpRight size={16} />
-                  </span>
-                  Browse Offers
-                </span>
-                {/* Needs buyer identity in the payment flow before it can list
-                    anything, so it stays disabled rather than half-wired. */}
-                <span
-                  title="Requires buyer identity in the payment flow"
-                  className="flex w-full cursor-not-allowed items-center gap-3 rounded-xl px-3 py-3 text-left font-medium text-slate-400"
-                >
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-400">
-                    <ArrowUpRight size={16} />
-                  </span>
-                  My Licenses
-                  <span className="ml-auto rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
-                    Soon
-                  </span>
-                </span>
-                <span
-                  title="Reuses the Nostr identity of the connected signer"
-                  className="flex w-full cursor-not-allowed items-center gap-3 rounded-xl px-3 py-3 text-left font-medium text-slate-400"
-                >
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-400">
-                    <ArrowUpRight size={16} />
-                  </span>
-                  Profile
-                </span>
-              </nav>
-
-              <div className="mt-10 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-                <div className="flex items-center gap-2 font-semibold">
-                  <span className="text-lg text-emerald-500">⚡</span>
-                  Powered by
-                </div>
-                <p className="mt-1 text-slate-500">Nostr + Lightning</p>
-              </div>
-            </aside>
-
-            <section className="p-6 md:p-8">
-              <div className="flex flex-wrap items-end justify-between gap-4">
-                <div>
-                  <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-                    Browse Offers
-                  </h1>
-                  <p className="mt-1 text-slate-500">
-                    Watermarked previews from creators who have published a
-                    licensing offer.
-                  </p>
-                </div>
-
-                <div className="relative w-full sm:w-64">
-                  <Search
-                    size={16}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search titles and creators"
-                    className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-blue-600"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                {FILTERS.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => setFilter(option.id)}
-                    className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                      filter === option.id
-                        ? "bg-slate-900 text-white"
-                        : "border border-slate-300 bg-white text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-
-              {message && (
-                <p className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {message}
-                </p>
-              )}
-
-              {state === "loading" && (
-                <p className="mt-8 text-sm text-slate-500">Loading offers…</p>
-              )}
-
-              {state === "ready" && offers.length === 0 && (
-                <div className="mt-8 rounded-xl border border-dashed border-slate-300 p-10 text-center">
-                  <p className="font-semibold text-slate-700">No offers yet</p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Offers appear here once a creator publishes one to Nostr.
-                  </p>
-                </div>
-              )}
-
-              {state === "ready" && offers.length > 0 && visible.length === 0 && (
-                <p className="mt-8 text-sm text-slate-500">
-                  No offers match that search.
-                </p>
-              )}
-
-              {visible.length > 0 && (
-                <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                  {visible.map((offer) => (
-                    <OfferCard key={offer.offer_id} offer={offer} />
-                  ))}
-                </div>
-              )}
-            </section>
+    <AppShell role="brand" active="browse">
+      <PageHeader
+        eyebrow="Brand / Client"
+        title="Browse Offers"
+        subtitle="Watermarked previews from creators who have published a licensing offer."
+        action={
+          <div className="relative w-full sm:w-72">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search titles and creators"
+              aria-label="Search offers"
+              className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm text-navy outline-none transition placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-brand/20"
+            />
           </div>
+        }
+      />
+
+      <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Filter by length">
+        {FILTERS.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => setFilter(option.id)}
+            aria-pressed={filter === option.id}
+            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+              filter === option.id
+                ? "bg-brand text-white shadow-sm shadow-blue-600/20"
+                : "border border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-navy"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      {message && (
+        <p role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {message}
+        </p>
+      )}
+
+      {state === "loading" && (
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true" aria-label="Loading offers">
+          {[0, 1, 2].map((n) => (
+            <div key={n} className="animate-pulse overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-soft">
+              <div className="h-44 bg-slate-200" />
+              <div className="space-y-3 p-4">
+                <div className="h-4 w-2/3 rounded bg-slate-200" />
+                <div className="h-3 w-1/3 rounded bg-slate-100" />
+                <div className="h-10 rounded-xl bg-slate-100" />
+              </div>
+            </div>
+          ))}
         </div>
-      </main>
-    </>
+      )}
+
+      {state === "ready" && offers.length === 0 && (
+        <div className="anza-fade-up rounded-2xl border border-slate-200/80 bg-white px-6 py-16 text-center shadow-soft">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-brand">
+            <SearchX size={26} />
+          </span>
+          <h2 className="mt-4 text-lg font-extrabold text-navy">No offers yet</h2>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
+            Offers appear here once a creator publishes one to Nostr.
+          </p>
+        </div>
+      )}
+
+      {state === "ready" && offers.length > 0 && visible.length === 0 && (
+        <p className="rounded-2xl border border-slate-200/80 bg-white px-6 py-10 text-center text-sm text-slate-500 shadow-soft">
+          No offers match that search.
+        </p>
+      )}
+
+      {visible.length > 0 && (
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {visible.map((offer) => (
+            <OfferCard key={offer.offer_id} offer={offer} />
+          ))}
+        </div>
+      )}
+    </AppShell>
   );
 }
 
 function OfferCard({ offer }: { offer: DiscoveryListing }) {
   const image = offer.thumbnail_url ?? offer.preview_url;
   return (
-    <article className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
-      <div className="relative">
+    <article className="anza-fade-up flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-soft transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
+      <div className="relative bg-slate-900">
         <img src={image} alt={offer.title ?? "Creator content"} className="h-44 w-full object-cover" />
+        <span className="absolute left-1/2 top-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-brand">
+          <Play size={16} className="ml-0.5 fill-current" />
+        </span>
         {offer.duration_seconds !== null && (
-          <span className="absolute bottom-3 right-3 rounded-md bg-slate-900/80 px-2 py-1 text-[11px] font-semibold text-white">
+          <span className="absolute bottom-2.5 right-2.5 rounded bg-slate-900/80 px-1.5 py-0.5 text-[11px] font-semibold text-white">
             {formatDuration(offer.duration_seconds)}
           </span>
         )}
@@ -217,33 +170,34 @@ function OfferCard({ offer }: { offer: DiscoveryListing }) {
 
       <div className="flex flex-1 flex-col space-y-4 p-4">
         <div>
-          <p className="truncate text-lg font-semibold text-slate-800" title={offer.title ?? undefined}>
+          <p className="truncate text-base font-bold text-navy" title={offer.title ?? undefined}>
             {offer.title ?? "Creator content"}
           </p>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-0.5 font-mono text-xs text-slate-500">
             {creatorHandle(offer.creator_public_key)}
           </p>
         </div>
 
-        <div className="space-y-2 text-sm text-slate-600">
+        <div className="space-y-2 rounded-xl bg-slate-50 p-3 text-sm">
           <p className="flex items-center justify-between gap-3">
             <span className="text-slate-500">License</span>
-            <span className="font-medium text-slate-700">
+            <span className="font-semibold text-slate-700">
               {LICENSE_TYPE_LABELS[licenseType(offer.license_duration)]}
             </span>
           </p>
           {/* Sats are the only price. There is no KES conversion, so none is shown. */}
           <p className="flex items-center justify-between gap-3">
             <span className="text-slate-500">Price</span>
-            <span className="text-lg font-bold text-slate-900">
-              {offer.price_sats.toLocaleString()} <span className="text-sm font-medium text-slate-500">sats</span>
+            <span className="text-lg font-extrabold text-navy">
+              {offer.price_sats.toLocaleString()}{" "}
+              <span className="text-xs font-semibold text-slate-500">sats</span>
             </span>
           </p>
         </div>
 
         <Link
           href={`/offers/${offer.offer_id}`}
-          className="mt-auto flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+          className="mt-auto flex w-full items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-brand-dark active:scale-[0.98]"
         >
           View Offer
         </Link>

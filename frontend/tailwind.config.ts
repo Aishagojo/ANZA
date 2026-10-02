@@ -22,9 +22,27 @@ const config: Config = {
         },
         bitcoin: "#F7931A",
         border: "#E2E8F0",
+        // Deep navy used for page titles in the Creator / Brand screens.
+        navy: "#0B1B4B",
+      },
+      boxShadow: {
+        soft: "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(37,99,235,0.07)",
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        // `var(--font-inter, Inter)` carries a fallback: if next/font cannot load
+        // Inter (offline dev, blocked Google Fonts) the declaration stays valid and
+        // the browser uses the sans-serif stack instead of dropping to Times.
+        sans: [
+          "var(--font-inter, Inter)",
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica Neue",
+          "Arial",
+          "sans-serif",
+        ],
       },
       maxWidth: {
         page: "1280px",
