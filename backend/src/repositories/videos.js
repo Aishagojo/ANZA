@@ -46,15 +46,17 @@ export class PostgresContentStore extends PostgresOfferStore {
   }
   // Discovery. Only offers the licensing engine has already published are
   // discoverable, and an offer already licensed is no longer purchasable so it
-  // is not offered for purchase again. The joined video supplies the
-  // watermarked preview; the stored original is never selected here.
+  // is not offered for purchase again. A settled offer whose license is still
+  // being published stays 'published' until the relay accepts the license event,
+  // so it remains listed while it is still purchasable. The joined video
+  // supplies the watermarked preview; the stored original is never selected here.
   async listDiscoverableOffers(limit) {
     return (await this.pool.query(
       `SELECT o.document AS offer, v.document AS video
        FROM offers o LEFT JOIN videos v ON v.id = o.video_id
-       WHERE o.document->>'status' = ANY($1)
+       WHERE o.document->>'status' = 'published'
        ORDER BY (o.document->>'created_at')::bigint DESC
-       LIMIT $2`, [['published', 'licensing'], limit]
+       LIMIT $1`, [limit]
     )).rows;
   }
 }

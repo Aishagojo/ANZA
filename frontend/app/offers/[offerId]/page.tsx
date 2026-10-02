@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle, ExternalLink, Calendar } from "lucide-react";
+import { CheckCircle, ExternalLink, Calendar, Loader2 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -11,7 +11,7 @@ import { ContentPreview } from "@/components/offer/ContentPreview";
 import { VerificationCard } from "@/components/offer/VerificationCard";
 import { LicenseDetails } from "@/components/offer/LicenseDetails";
 import { getOffer } from "@/lib/api";
-import { Offer } from "@/lib/types";
+import { LicenseIssuance, Offer } from "@/lib/types";
 
 /**
  * Screen 3 (Public Offer Page) AND Screen 5 (Licensed Confirmation) share
@@ -21,8 +21,11 @@ import { Offer } from "@/lib/types";
  *
  * Data comes from GET /api/offers/:offerId (lib/api.getOffer). We render:
  *   - status OPEN / PAYMENT_PENDING -> public offer view with Purchase CTA
+ *   - status PAYMENT_SETTLED       -> paid, license not yet recorded
  *   - status LICENSED               -> licensed confirmation view
  */
+const LICENSE_POLL_INTERVAL_MS = 4000;
+
 export default function OfferPage({ params }: { params: { offerId: string } }) {
   const [offer, setOffer] = useState<Offer | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +43,30 @@ export default function OfferPage({ params }: { params: { offerId: string } }) {
       cancelled = true;
     };
   }, [params.offerId]);
+
+  // A settled offer renders a "issuing your license" notice, so it has to be
+  // able to move on by itself once the relay accepts the event. Polling stops
+  // as soon as the status leaves PAYMENT_SETTLED, and a failed poll is ignored
+  // rather than replacing the page with an error.
+  useEffect(() => {
+    if (offer?.status !== "PAYMENT_SETTLED") return;
+    let cancelled = false;
+    const timer = setInterval(() => {
+      getOffer(params.offerId)
+        .then((data) => {
+          if (cancelled) return;
+          setOffer(data);
+          if (data.status !== "PAYMENT_SETTLED") clearInterval(timer);
+        })
+        .catch(() => {
+          /* transient; try again on the next tick */
+        });
+    }, LICENSE_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [offer?.status, params.offerId]);
 
   if (error) {
     return (
@@ -71,16 +98,24 @@ export default function OfferPage({ params }: { params: { offerId: string } }) {
     );
   }
 
+  // A settled offer keeps the public view: it is still the same offer, and it
+  // carries the SettlementNotice that distinguishes "licensing" from
+  // "no license will ever be issued". Routing it to a separate success screen
+  // is what previously reported an unlicensed payment as complete success.
   if (offer.status === "LICENSED") return <LicensedView offer={offer} />;
-  if (offer.status === "PAYMENT_SETTLED") return <PaymentConfirmedView offer={offer} />;
   return <PublicOfferView offer={offer} />;
 }
 
 /** Screen 3 — spec section 11/12/13 */
 function PublicOfferView({ offer }: { offer: Offer }) {
+  // The "Verified Record" pill asserts a relay acknowledgement, so it is only
+  // shown when an event id actually exists. Passing it unconditionally would
+  // claim Nostr verification for an offer the relay has not accepted.
+  const hasEvent = Boolean(offer.nostrEventId);
+
   return (
     <main>
-      <Navbar backHref="/" verified />
+      <Navbar backHref="/" verified={hasEvent} />
       <div className="mx-auto max-w-3xl px-6 py-10">
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
           <ContentPreview url={offer.contentUrl} title={offer.title} />
@@ -121,6 +156,11 @@ function PublicOfferView({ offer }: { offer: Offer }) {
               </Button>
             </Link>
           )}
+          {offer.status === "PAYMENT_SETTLED" && (
+            <div className="mt-6">
+              <SettlementNotice issuance={offer.licenseIssuance} />
+            </div>
+          )}
         </Card>
 
         <div className="mt-6">
@@ -131,80 +171,54 @@ function PublicOfferView({ offer }: { offer: Offer }) {
   );
 }
 
-/** Payment receipt — shown only after the backend confirms the LND settlement. */
-function PaymentConfirmedView({ offer }: { offer: Offer }) {
-  const settledDate = offer.paymentSettledAt
-    ? new Date(offer.paymentSettledAt * 1000).toLocaleString("en-US", {
-        day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit"
-      })
-    : "Confirmed by Lightning node";
+/**
+ * A paid offer whose license has not been recorded yet.
+ *
+ * The payment really is settled — this must not be dressed up as a failure, and
+ * it must not be dressed up as success either. Which of the two is true depends
+ * on whether the backend is still relaying the license event or simply has no
+ * attestor configured.
+ */
+function SettlementNotice({ issuance }: { issuance: LicenseIssuance | undefined }) {
+  if (issuance === "unavailable") {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+        <p className="font-medium text-amber-800">
+          Payment received — license could not be issued
+        </p>
+        <p className="mt-1 text-amber-700">
+          The payment has settled, but this deployment has no license signer
+          configured, so no license record was produced. Your payment is not
+          lost; contact the creator with the offer link.
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <main>
-      <Navbar backHref="/" verified />
-      <div className="mx-auto max-w-2xl px-6 py-12 text-center">
-        <CheckCircle size={56} className="mx-auto text-success" />
-        <p className="mt-4 text-sm font-semibold uppercase tracking-[0.18em] text-success">
-          Lightning settlement verified
-        </p>
-        <h1 className="mt-2 text-3xl font-bold text-text-primary">Payment Confirmed</h1>
-        <p className="mt-2 text-sm text-text-secondary">
-          {offer.priceSats.toLocaleString()} sats has settled to the Creator node.
-        </p>
-
-        <Card className="mt-8 text-left">
-          <div className="flex items-center gap-4">
-            <ContentPreview url={offer.contentUrl} title={offer.title} size="small" />
-            <div>
-              <p className="font-semibold text-text-primary">{offer.title}</p>
-              <p className="mt-1 text-sm text-text-secondary">License payment receipt</p>
-            </div>
-          </div>
-
-          <div className="mt-6 border-t border-border pt-6">
-            <LicenseDetails offer={offer} />
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 gap-4 border-t border-border pt-6 sm:grid-cols-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Amount settled</p>
-              <p className="mt-1 text-lg font-bold text-text-primary">{offer.priceSats.toLocaleString()} sats</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Settlement time</p>
-              <p className="mt-1 text-sm font-medium text-text-primary">{settledDate}</p>
-            </div>
-          </div>
-        </Card>
-
-        <div className="mt-6 text-left">
-          <VerificationCard eventId={offer.nostrEventId} label="Original offer verified on Nostr" />
-        </div>
-
-        <div className="mt-6 rounded-xl border border-border bg-surface p-5 text-left">
-          <p className="text-sm font-semibold text-text-primary">License record</p>
-          <p className="mt-1 text-sm text-text-secondary">
-            Payment is confirmed. The linked Nostr license attestation will appear here when it is signed and published.
-          </p>
-        </div>
-      </div>
-    </main>
+    <div className="rounded-lg border border-border bg-surface px-4 py-3 text-sm">
+      <p className="flex items-center gap-2 font-medium text-text-primary">
+        <Loader2 size={16} className="animate-spin text-brand" />
+        Payment received — issuing your license
+      </p>
+      <p className="mt-1 text-text-secondary">
+        The license event is being signed and published to Nostr. This page
+        updates automatically once a relay accepts it.
+      </p>
+    </div>
   );
 }
 
 /** Screen 5 — spec section 18/19 */
 function LicensedView({ offer }: { offer: Offer }) {
-  const licensedDate = offer.licensedAt
-    ? new Date(offer.licensedAt).toLocaleDateString("en-US", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    : "—";
+  // LICENSED is only ever set once a relay accepted the event, so the license
+  // is expected here. If it is somehow absent, say so rather than rendering a
+  // confirmation backed by nothing.
+  const license = offer.license;
 
   return (
     <main>
-      <Navbar backHref="/" />
+      <Navbar backHref="/" verified={Boolean(offer.nostrEventId)} />
       <div className="mx-auto max-w-2xl px-6 py-12 text-center">
         <CheckCircle size={56} className="mx-auto text-success" />
         <h1 className="mt-4 text-2xl font-bold text-success">LICENSED</h1>
@@ -220,10 +234,26 @@ function LicensedView({ offer }: { offer: Offer }) {
 
           <div className="mt-6 border-t border-border pt-6">
             <LicenseDetails offer={offer} />
-            <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              <Calendar size={14} /> Licensed
-            </div>
-            <p className="mt-1 text-sm font-medium text-text-primary">{licensedDate}</p>
+            {license && (
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                    <Calendar size={14} /> License starts
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-text-primary">
+                    {formatUnix(license.startsAt)}
+                  </p>
+                </div>
+                <div>
+                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                    <Calendar size={14} /> License ends
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-text-primary">
+                    {license.endsAt === null ? "Perpetual" : formatUnix(license.endsAt)}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-6 border-t border-border pt-6">
@@ -234,31 +264,29 @@ function LicensedView({ offer }: { offer: Offer }) {
               <p className="flex items-center gap-2 text-sm text-success">
                 <CheckCircle size={14} /> Payment confirmed
               </p>
-              <p className="flex items-center gap-2 text-sm text-success">
-                <CheckCircle size={14} /> License recorded on Nostr
-              </p>
+              {/* Only claim the Nostr record when the backend returned one. */}
+              {license && (
+                <p className="flex items-center gap-2 text-sm text-success">
+                  <CheckCircle size={14} /> License recorded on Nostr
+                </p>
+              )}
             </div>
 
-            {offer.licenseNostrEventId && (
+            {license && (
               <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-surface px-3.5 py-2.5">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
                     Nostr Event
                   </p>
-                  <code className="text-xs text-text-secondary">
-                    {offer.licenseNostrEventId.slice(0, 20)}...
+                  <code className="break-all text-xs text-text-secondary">
+                    {license.eventId}
                   </code>
                 </div>
-                {/*
-                  BACKEND/PRODUCT TEAM: point this at a real Nostr explorer,
-                  e.g. `https://njump.me/${offer.licenseNostrEventId}`, once
-                  events are actually published to a relay.
-                */}
                 <a
-                  href={`https://njump.me/${offer.licenseNostrEventId}`}
+                  href={`https://njump.me/${license.eventId}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1 text-xs font-medium text-brand hover:underline"
+                  className="flex shrink-0 items-center gap-1 text-xs font-medium text-brand hover:underline"
                 >
                   View Event <ExternalLink size={12} />
                 </a>
@@ -269,4 +297,13 @@ function LicensedView({ offer }: { offer: Offer }) {
       </div>
     </main>
   );
+}
+
+/** Unix seconds as a human date. */
+function formatUnix(seconds: number): string {
+  return new Date(seconds * 1000).toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }

@@ -1,4 +1,4 @@
-import { CreateOfferPayload, CreateOfferResponse, Offer, OfferStatusResponse, PaymentRequestResponse } from "./types";
+import { CreateOfferPayload, CreateOfferResponse, LicenseIssuance, Offer, OfferLicense, OfferStatusResponse, PaymentRequestResponse } from "./types";
 import { LICENSE_TYPE_DESCRIPTIONS, LICENSE_TYPE_LABELS } from "./licenseTypes";
 import { sha256Hex, signHttpAuthorization, signOfferEvent } from "./nostr";
 
@@ -15,6 +15,8 @@ type BackendOffer = {
   status: "draft" | "publishing" | "published" | "licensed";
   event_id: string | null;
   payment?: { status?: "pending" | "settled"; settled_at?: number };
+  license?: OfferLicense;
+  license_issuance?: LicenseIssuance;
 };
 
 function idempotencyKey() { return crypto.randomUUID().replaceAll("-", ""); }
@@ -53,7 +55,13 @@ function fromBackend(offer: BackendOffer): Offer {
     contentUrl: offer.terms.content_url, brandName: offer.terms.brand, priceSats: offer.terms.amount_sats,
     licenseType: type, licenseDescription: offer.terms.usage_rights,
     status: offer.status === "licensed" ? "LICENSED" : offer.payment?.status === "settled" ? "PAYMENT_SETTLED" : offer.payment?.status === "pending" ? "PAYMENT_PENDING" : "OPEN",
-    nostrEventId: offer.event_id ?? "Pending relay acknowledgement",
+    // Both are omitted rather than defaulted: the licensed screen only claims a
+    // Nostr record when the backend actually returned one.
+    ...(offer.license ? { license: offer.license } : {}),
+    ...(offer.license_issuance ? { licenseIssuance: offer.license_issuance } : {}),
+    // Left null rather than replaced with a placeholder string: a placeholder
+    // would be rendered as though it were an event id.
+    nostrEventId: offer.event_id,
     ...(offer.payment?.settled_at ? { paymentSettledAt: offer.payment.settled_at } : {}),
     creatorHandle: `${offer.creator_pubkey.slice(0, 8)}…${offer.creator_pubkey.slice(-6)}` };
 }

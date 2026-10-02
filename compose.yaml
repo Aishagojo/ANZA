@@ -10,9 +10,14 @@ services:
       POSTGRES_PASSWORD: change-me
       POSTGRES_DB: contentport
     ports:
-      - "127.0.0.1:5432:5432"
+      # Defaults to the standard host port. If a native PostgreSQL already
+      # occupies 5432, set POSTGRES_HOST_PORT in the repo-root .env (compose
+      # reads it for substitution) and use the same port in DATABASE_URL.
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Only applied to a brand-new data volume. Existing databases are brought
+      # up to date by `npm run migrate` in backend/.
       - ./backend/src/database/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U contentport -d contentport"]

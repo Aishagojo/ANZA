@@ -102,7 +102,9 @@ rule that the existing licensing rules do not have.
 ## Discovery eligibility
 
 `GET /offers` lists offers the licensing engine has already published
-(`published`) or that are awaiting license publication (`licensing`). Drafts are
+(`published`). A settled offer whose license event is still awaiting relay
+acknowledgement stays `published`, so it remains listed while it is still
+purchasable. Drafts are
 private, and an already `licensed` offer is no longer purchasable, so it is not
 listed. Results are capped at 50 and ordered newest first. A brand clicks a card,
 then `GET /offers/{id}` remains the authoritative detail source; cards are

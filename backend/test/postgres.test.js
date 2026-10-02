@@ -12,7 +12,7 @@ async function withSchema(run) {
   await admin.query(`CREATE SCHEMA ${schema}`);
   const pool = new pgModule.Pool({ connectionString: process.env.TEST_DATABASE_URL, options: `-c search_path=${schema}` });
   try {
-    for (const migration of ['001_offers.sql', '002_videos.sql']) {
+    for (const migration of ['001_offers.sql', '002_licenses.sql', '002_videos.sql']) {
       await pool.query(await readFile(new URL(`../src/database/migrations/${migration}`, import.meta.url), 'utf8'));
     }
     await run(pool, schema);
@@ -96,7 +96,9 @@ test('content layer persists ownership in the database and filters discovery by 
     assert.deepEqual(await store.listOffersForVideo(video.id),
       [{ video_id: 'video_1', id: 'offer_1', status: 'draft', amount_sats: 5000, created_at: 2000 }]);
 
-    // Only published and licensing offers are discoverable.
+// Only published offers are discoverable. A settled offer whose license is
+    // still awaiting relay publication stays 'published' and remains listed; a
+    // licensed offer is no longer purchasable and drops out.
     await pool.query('UPDATE offers SET document = jsonb_set(document, \'{status}\', \'"published"\') WHERE id = $1', ['offer_1']);
     const listed = await store.listDiscoverableOffers(50);
     assert.equal(listed.length, 1);
@@ -104,8 +106,8 @@ test('content layer persists ownership in the database and filters discovery by 
     assert.equal(listed[0].video.id, video.id);
     await pool.query('UPDATE offers SET document = jsonb_set(document, \'{status}\', \'"licensed"\') WHERE id = $1', ['offer_1']);
     assert.deepEqual(await store.listDiscoverableOffers(50), []);
-    await pool.query('UPDATE offers SET document = jsonb_set(document, \'{status}\', \'"licensing"\') WHERE id = $1', ['offer_1']);
-    assert.equal((await store.listDiscoverableOffers(50)).length, 1);
+    await pool.query('UPDATE offers SET document = jsonb_set(document, \'{status}\', \'"publishing"\') WHERE id = $1', ['offer_1']);
+    assert.deepEqual(await store.listDiscoverableOffers(50), []);
 
     // A creator's own library and its offer relationship.
     assert.equal((await store.listVideosByOwner(owner)).length, 1);

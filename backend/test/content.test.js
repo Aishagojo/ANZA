@@ -40,7 +40,7 @@ function setup({ verifyEvent = () => true, paymentProvider = null, media = cloud
     listOffersForOwner: async owner => [...offers.values()].filter(o => o.creator_pubkey === owner && o.video_id)
       .map(offer => ({ video_id: offer.video_id, ...offerSummaryRow(offer) })),
     listDiscoverableOffers: async () => [...offers.values()]
-      .filter(offer => ['published', 'licensing'].includes(offer.status))
+      .filter(offer => offer.status === 'published')
       .map(offer => ({ offer, video: offer.video_id ? videos.get(offer.video_id) : null })),
     async idempotent(scope, digest, work) {
       const prior = requests.get(scope);

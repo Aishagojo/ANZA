@@ -53,7 +53,7 @@ const videoRecord = object({
 
 const offerSummary = object({
   offer_id: recordId,
-  status: status('draft', 'publishing', 'published', 'licensing', 'licensed'),
+  status: status('draft', 'publishing', 'published', 'licensed'),
   price_sats: positive,
   created_at: time
 });
@@ -83,7 +83,7 @@ const discoveryListing = object({
   duration_seconds: nullable({ ...time, minimum: 0 }),
   license_duration: licenseDuration,
   price_sats: positive,
-  status: status('published', 'licensing'),
+  status: status('published'),
   created_at: time
 });
 

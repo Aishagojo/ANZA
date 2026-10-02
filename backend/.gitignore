@@ -23,8 +23,9 @@ uploads/
 *.dump
 *.backup
 
-# ...but migrations are part of the application, not local database exports.
-# Without this a fresh clone has no videos/upload_sessions tables.
+# ...but migrations are source code, not data. They must be committed
+# or a fresh checkout cannot build the database.
+!src/database/migrations/*.sql
 !src/database/migrations/*.sql
 
 # Test output, logs, and runtime files

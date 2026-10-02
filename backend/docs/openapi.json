@@ -1670,7 +1670,6 @@
                     "draft",
                     "publishing",
                     "published",
-                    "licensing",
                     "licensed"
                   ]
                 },
@@ -1887,7 +1886,6 @@
                           "draft",
                           "publishing",
                           "published",
-                          "licensing",
                           "licensed"
                         ]
                       },
@@ -2047,8 +2045,7 @@
           "status": {
             "type": "string",
             "enum": [
-              "published",
-              "licensing"
+              "published"
             ]
           },
           "created_at": {
@@ -2197,8 +2194,7 @@
                 "status": {
                   "type": "string",
                   "enum": [
-                    "published",
-                    "licensing"
+                    "published"
                   ]
                 },
                 "created_at": {

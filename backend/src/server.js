@@ -6,6 +6,7 @@ import { createOfferService } from './services/offers/service.js';
 import { createContentService } from './services/content/service.js';
 import { createCloudinary } from './services/media/cloudinary.js';
 import { createRelayPublisher } from './services/nostr/publisher.js';
+import { createAttestorSigner } from './services/nostr/signer.js';
 import { createLndClient } from './services/payments/lnd-client.js';
 import { createApp } from './app.js';
 
@@ -14,7 +15,11 @@ const pool = new pg.Pool({ connectionString: config.databaseUrl, connectionTimeo
 const store = new PostgresContentStore(pool);
 await pool.query('SELECT 1 FROM nostr_outbox LIMIT 1');
 const paymentProvider = createLndClient({ restUrl: config.lndRestUrl, macaroon: config.lndMacaroon });
-const service = createOfferService({ store, verifyEvent, paymentProvider, ...config });
+// License issuance needs both a kind and the attestor key. Say so plainly rather
+// than letting settled offers sit unlicensed with no explanation.
+if (config.licenseKind && !config.attestorSecretKey) console.warn('NOSTR_LICENSE_KIND is set but NOSTR_ATTESTOR_SECRET is not; settled offers will not be licensed.');
+if (config.attestorSecretKey && !config.licenseKind) console.warn('NOSTR_ATTESTOR_SECRET is set but NOSTR_LICENSE_KIND is not; settled offers will not be licensed.');
+const service = createOfferService({ store, verifyEvent, paymentProvider, signEvent: createAttestorSigner(), ...config });
 const contentService = createContentService({ store, cloudinary: createCloudinary(config.cloudinary) });
 const publish = createRelayPublisher({ relays: config.relays });
 const server = createApp({ service, contentService, verifyEvent, origin: config.origin, corsOrigin: config.corsOrigin });
