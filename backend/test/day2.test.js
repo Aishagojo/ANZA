@@ -10,6 +10,7 @@ import { readConfig } from '../src/config/index.js';
 import { matchOfferRoute } from '../src/routes/offers.js';
 import { Readable } from 'node:stream';
 import { createApp } from '../src/app.js';
+import { npubEncode, nsecEncode } from 'nostr-tools/nip19';
 
 const pubkey = 'a'.repeat(64);
 const attestorPubkey = 'b'.repeat(64);
@@ -148,6 +149,10 @@ test('relay rejection and missing acknowledgements fail; another relay can succe
 test('configuration rejects missing keys and insecure non-local relays', () => {
   const env = { DATABASE_URL: 'postgresql://localhost/test', NOSTR_OFFER_KIND: '9998', NOSTR_ATTESTOR_PUBKEY: attestorPubkey, NOSTR_RELAYS: 'ws://localhost:7777' };
   assert.equal(readConfig(env).kind, 9998);
+  assert.equal(readConfig({ ...env, NOSTR_ATTESTOR_PUBKEY: npubEncode(attestorPubkey) }).attestorPubkey, attestorPubkey);
+  for (const invalid of ['', 'b'.repeat(63), 'npub1invalid', nsecEncode(new Uint8Array(32).fill(1))]) {
+    assert.throws(() => readConfig({ ...env, NOSTR_ATTESTOR_PUBKEY: invalid }), /NOSTR_ATTESTOR_PUBKEY/);
+  }
   assert.throws(() => readConfig({ ...env, NOSTR_OFFER_KIND: '' }));
   assert.throws(() => readConfig({ ...env, NOSTR_RELAYS: 'ws://remote.example' }));
   assert.equal(matchOfferRoute('POST', '/api/offers').action, 'create');
