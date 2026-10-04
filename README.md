@@ -1,6 +1,6 @@
 <div align="center">
 
-# ContentPort
+# ANZA
 
 ### Creator-signed licensing offers, verifiable on Nostr and payable over Lightning.
 
@@ -15,7 +15,7 @@
 
 ## Table of contents
 
-- [What ContentPort is](#what-contentport-is)
+- [What ANZA is](#what-ANZA-is)
 - [Project status](#project-status)
 - [Features](#features)
   - [Implemented](#implemented)
@@ -46,13 +46,13 @@
 
 ---
 
-## What ContentPort is
+## What ANZA is
 
-ContentPort turns a creator's licensing terms into a **signed, portable record** that a brand can verify without trusting the platform's UI.
+ANZA turns a creator's licensing terms into a **signed, portable record** that a brand can verify without trusting the platform's UI.
 
 The problem it addresses is mundane and specific: creators in creator-economy markets routinely agree to brand usage over DMs. Price, rights, duration, and payment expectation end up scattered across private messages, and once a deal falls apart there is no durable evidence of what was actually offered.
 
-ContentPort replaces that conversation with two machine-verifiable artefacts:
+ANZA replaces that conversation with two machine-verifiable artefacts:
 
 - a **creator-signed Nostr event** stating exactly what was offered — content reference, fingerprint, brand, price, permitted uses, duration;
 - an **attestor-signed Nostr event** recording that a matching Lightning invoice settled.
@@ -171,7 +171,7 @@ Genuine gaps, tracked in [Known gaps](#known-gaps):
 
 ### Future architecture
 
-ContentPort is a **single Node.js service with a PostgreSQL database**, not a microservice system. The current code deliberately separates concerns at the module level — `services/content`, `services/media`, `services/offers`, `services/nostr`, `services/payments`, `repositories`, `contracts` — and every external dependency is injected through a constructor argument (`store`, `verifyEvent`, `paymentProvider`, `signEvent`, `publish`).
+ANZA is a **single Node.js service with a PostgreSQL database**, not a microservice system. The current code deliberately separates concerns at the module level — `services/content`, `services/media`, `services/offers`, `services/nostr`, `services/payments`, `repositories`, `contracts` — and every external dependency is injected through a constructor argument (`store`, `verifyEvent`, `paymentProvider`, `signEvent`, `publish`).
 
 That injection is the seam intended for later extraction. `createLndClient` already takes a `fetchImpl`; the relay publisher takes a `WebSocketImpl`; the offer service takes a `store`; the content service takes its own store and media client. Each of these can be replaced by a network call to a separate service without touching the business rules.
 
@@ -205,7 +205,7 @@ The Licensing Engine does not need to store media, and it should not. Uploaded m
 Two deliberate design decisions are worth stating:
 
 - **NIP-78 is rejected.** Replaceable events (kind `30078`) let a later write silently replace an earlier one. A licensing record is a historical fact, so the project uses regular non-replaceable events instead.
-- **Kind `27235` for HTTP auth is NIP-98-shaped but not NIP-98-compliant.** The tags `u`, `method`, and `payload` follow NIP-98's intent, but the project adds a `contentport-idempotency-key` tag that is not in the NIP, and no NIP-98 conformance is claimed anywhere in the repository. Treat it as a project-specific auth scheme that borrows the kind number.
+- **Kind `27235` for HTTP auth is NIP-98-shaped but not NIP-98-compliant.** The tags `u`, `method`, and `payload` follow NIP-98's intent, but the project adds a `ANZA-idempotency-key` tag that is not in the NIP, and no NIP-98 conformance is claimed anywhere in the repository. Treat it as a project-specific auth scheme that borrows the kind number.
 
 ### Event kinds
 
@@ -217,19 +217,19 @@ Both kinds must be chosen explicitly by the operator. There is **no default**, b
 | `9999` | `NOSTR_LICENSE_KIND` | `9999` | Settlement attestation / licence record | Platform attestor |
 | `27235` | hard-coded | `27235` | HTTP request authentication | Calling party |
 
-`9998` and `9999` are **development placeholders**, not registered ContentPort kinds. Production values must be chosen after a kind-registry collision check.
+`9998` and `9999` are **development placeholders**, not registered ANZA kinds. Production values must be chosen after a kind-registry collision check.
 
 ### Event structure
 
 **Offer event** — author: creator
 
-Tags: `[["t", "contentport-offer-v1"]]`
+Tags: `[["t", "ANZA-offer-v1"]]`
 
 Content (JSON string):
 
 ```json
 {
-  "schema": "contentport.offer.v1",
+  "schema": "ANZA.offer.v1",
   "terms": {
     "title": "Summer Campaign Video",
     "description": "Short promotional video.",
@@ -248,19 +248,19 @@ Content (JSON string):
 
 **Licence event** — author: platform attestor
 
-Tags: `[["e", "<offer event id>"], ["p", "<creator pubkey>"], ["t", "contentport-license-v1"]]`
+Tags: `[["e", "<offer event id>"], ["p", "<creator pubkey>"], ["t", "ANZA-license-v1"]]`
 
 Content (JSON string):
 
 ```json
 {
-  "schema": "contentport.license.v1",
+  "schema": "ANZA.license.v1",
   "offer_event_id": "<64 hex chars>",
   "payment_hash": "<64 hex chars>",
   "amount_sats": 25000,
   "starts_at": 1790768211,
   "ends_at": 1793360211,
-  "evidence_type": "contentport-settlement-attestation"
+  "evidence_type": "ANZA-settlement-attestation"
 }
 ```
 
@@ -552,7 +552,7 @@ The Licensing Engine is the natural extraction point. It depends on content only
 ## Project structure
 
 ```text
-contentport/
+ANZA/
 ├── compose.yaml                  # PostgreSQL 17 + strfry (dev)
 ├── strfry.conf                   # Local relay config (dev only)
 ├── .env                          # Compose var substitution (gitignored)
@@ -653,7 +653,7 @@ Create `backend/.env`. It is gitignored and must never be committed. See [Config
 HOST=127.0.0.1
 PORT=3000
 PUBLIC_ORIGIN=http://localhost:3000
-DATABASE_URL=postgresql://contentport:change-me@localhost:5432/contentport
+DATABASE_URL=postgresql://ANZA:change-me@localhost:5432/ANZA
 
 NOSTR_OFFER_KIND=9998
 NOSTR_LICENSE_KIND=9999
@@ -738,7 +738,7 @@ Using Polar with **two** LND nodes in the same regtest network:
 
 | Variable | Required | Purpose | Example | Notes |
 | --- | :---: | --- | --- | --- |
-| `DATABASE_URL` | **Yes** | PostgreSQL connection string | `postgresql://contentport:change-me@localhost:5432/contentport` | Fails fast if unset |
+| `DATABASE_URL` | **Yes** | PostgreSQL connection string | `postgresql://ANZA:change-me@localhost:5432/ANZA` | Fails fast if unset |
 | `POSTGRES_HOST_PORT` | No | Compose host port for PostgreSQL | `5432` | Read from repository-root `.env` by Compose, not by the app |
 | `TEST_DATABASE_URL` | No | Enables the PostgreSQL integration test | `postgresql://.../scratch` | Test creates and drops its own schema |
 
@@ -780,7 +780,7 @@ keeps working, the same way an unconfigured LND wallet does.
 | `CLOUDINARY_CLOUD_NAME` | **Yes** for video | Cloud identifier from the console | `dgiocioqk` | Must match `/^[A-Za-z0-9_-]{1,64}$/` |
 | `CLOUDINARY_API_KEY` | **Yes** for video | Public API key | `679551628553288` | Must carry **upload** permission |
 | `CLOUDINARY_API_SECRET` | **Yes** for video | Signing secret | `<secret>` | Never returned to a client; only used to sign |
-| `CLOUDINARY_FOLDER` | No | Destination folder | `contentport/videos` | Defaults to `contentport/videos` |
+| `CLOUDINARY_FOLDER` | No | Destination folder | `ANZA/videos` | Defaults to `ANZA/videos` |
 
 > [!IMPORTANT]
 > The API key must be able to **upload**, not merely read the Media Library. A
@@ -914,7 +914,7 @@ signed parameter set fails a test rather than only surfacing as a `401` in produ
 The only environment that currently runs.
 
 - Application: Next.js on `:3001`, Node.js API on `:3000`, both on the developer machine
-- Database: PostgreSQL 17 in Docker Compose, credentials `contentport:change-me`
+- Database: PostgreSQL 17 in Docker Compose, credentials `ANZA:change-me`
 - Lightning: **Polar regtest** with LND Creator and Buyer nodes on the developer's machine
 - Nostr: local **strfry** relay at `ws://localhost:7777`, no auth, accepts everything
 - Secrets: local `.env` files, gitignored
@@ -1022,7 +1022,7 @@ Rules that follow from the implementation:
 
 ## Nostr environment isolation
 
-Relay configuration is not a cosmetic setting. A Nostr event published to a relay is public, indexed, and effectively permanent. ContentPort writes directly to whatever `NOSTR_RELAYS` names.
+Relay configuration is not a cosmetic setting. A Nostr event published to a relay is public, indexed, and effectively permanent. ANZA writes directly to whatever `NOSTR_RELAYS` names.
 
 ```text
 NOSTR_RELAYS=ws://localhost:7777          # development — strfry, disposable
